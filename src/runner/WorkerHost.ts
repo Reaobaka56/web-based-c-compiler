@@ -1,4 +1,6 @@
 // Thin wrapper around the program Web Worker.
+/// <reference types="vite/client" />
+
 import ProgramWorker from './program.worker?worker'
 
 export interface RunCallbacks {
@@ -16,14 +18,15 @@ export class WorkerHost {
   run(wasm: Uint8Array, cbs: RunCallbacks) {
     this.kill()
     this.cbs = cbs
-    this.worker = new ProgramWorker()
-    this.worker.onmessage = (e) => {
+    const worker = new ProgramWorker()
+    this.worker = worker
+    worker.onmessage = (e) => {
       const m = e.data
       if (m.type === 'stdout') this.cbs?.onStdout(m.data)
       else if (m.type === 'gui') this.cbs?.onGui(m)
       else if (m.type === 'exit') { this.cbs?.onExit(m.code); this.dispose() }
     }
-    this.worker.postMessage({ type: 'run', wasm }, [wasm.buffer])
+    worker.postMessage({ type: 'run', wasm }, [wasm.buffer])
   }
 
   sendStdin(data: string) { this.worker?.postMessage({ type: 'stdin', data }) }
