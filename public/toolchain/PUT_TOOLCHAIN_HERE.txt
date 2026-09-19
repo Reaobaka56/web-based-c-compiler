@@ -1,0 +1,1 @@
+Drop clang.wasm, wasm-ld.wasm and the sysroot here. See README.md.
