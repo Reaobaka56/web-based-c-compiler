@@ -21,6 +21,22 @@ export interface ToolchainStatus {
   files: string[]
 }
 
+// Minimal WASI module used until a real wasm-clang toolchain is installed.
+const DEMO_WASM = new Uint8Array([
+  0, 97, 115, 109, 1, 0, 0, 0,
+  1, 12, 2, 96, 4, 127, 127, 127, 127, 1, 127, 96, 0, 0,
+  2, 68, 2, 22, 119, 97, 115, 105, 95, 115, 110, 97, 112, 115, 104, 111, 116,
+  95, 112, 114, 101, 118, 105, 101, 119, 49, 8, 102, 100, 95, 119, 114, 105,
+  116, 101, 0, 0, 22, 119, 97, 115, 105, 95, 115, 110, 97, 112, 115, 104,
+  111, 116, 95, 112, 114, 101, 118, 105, 101, 119, 49, 6, 109, 101, 109,
+  111, 114, 121, 2, 0, 1,
+  3, 2, 1, 1,
+  7, 10, 1, 6, 95, 115, 116, 97, 114, 116, 0, 1,
+  10, 15, 1, 13, 0, 65, 1, 65, 0, 65, 1, 65, 8, 16, 0, 26, 11,
+  11, 33, 2, 0, 65, 0, 11, 8, 16, 0, 0, 0, 14, 0, 0, 0, 0,
+  65, 16, 11, 14, 72, 101, 108, 108, 111, 44, 32, 87, 111, 114, 108, 100, 33, 10
+])
+
 export async function toolchainStatus(): Promise<ToolchainStatus> {
   const needed = ['clang.wasm', 'wasm-ld.wasm']
   const found: string[] = []
@@ -55,12 +71,9 @@ export async function compileProject(
   if (!status.ready) {
     onLog('[compiler] toolchain not installed — running built-in demo binary.\n')
     onLog('[compiler] see README.md to enable real C++ compilation.\n')
-    const r = await fetch('/demo/hello.wasm')
-    if (!r.ok) throw new ToolchainMissingError()
-    return new Uint8Array(await r.arrayBuffer())
+    return DEMO_WASM.slice()
   }
   // Real implementation goes here (see sketch above).
   onLog('[compiler] toolchain detected, but pipeline not wired to this build.\n')
-  const r = await fetch('/demo/hello.wasm')
-  return new Uint8Array(await r.arrayBuffer())
+  return DEMO_WASM.slice()
 }

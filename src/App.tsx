@@ -105,11 +105,18 @@ export default function App() {
   return (
     <div className="app">
       <div className="topbar">
-        <span className="logo">CPP://Web</span>
-        <button className="btn primary" onClick={run} disabled={busy || !active}>▶ Run</button>
-        <button className="btn" onClick={stop} disabled={!busy}>■ Stop</button>
-        <button className="btn" onClick={guiDemo}>🖥 GUI Demo</button>
+        <div className="brand-lockup">
+          <span className="brand-mark">{`{;}`}</span>
+          <span className="logo">CPP://Web</span>
+          <span className="workspace-label">LOCAL WORKSPACE</span>
+        </div>
+        <div className="run-controls">
+          <button className="btn primary" onClick={run} disabled={busy || !active}><span className="btn-icon">▶</span> Run</button>
+          <button className="btn" onClick={stop} disabled={!busy}><span className="btn-icon">■</span> Stop</button>
+          <button className="btn btn-quiet" onClick={guiDemo}><span className="btn-icon">◈</span> Canvas</button>
+        </div>
         <span className={'status ' + (tcStatus === 'ready' ? 'ok' : tcStatus === 'demo' ? 'err' : '')}>
+          <span className="status-dot" />
           {tcStatus === 'checking' ? 'toolchain: checking…'
             : tcStatus === 'ready' ? 'toolchain: READY'
             : 'toolchain: DEMO MODE'}
