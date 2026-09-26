@@ -18,9 +18,14 @@ const Terminal = forwardRef<TerminalHandle>(function Terminal(_, ref) {
   useEffect(() => {
     const term = new XTerm({
       cursorBlink: true,
-      fontFamily: 'Cascadia Code, Menlo, monospace',
+      fontFamily: 'SFMono-Regular, Cascadia Code, Menlo, monospace',
       fontSize: 13,
-      theme: { background: '#0d1117' }
+      theme: {
+        background: '#111722',
+        foreground: '#d8e1f0',
+        cursor: '#81a9ff',
+        selectionBackground: '#7597d844'
+      }
     })
     const fit = new FitAddon()
     term.loadAddon(fit)

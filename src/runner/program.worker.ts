@@ -121,11 +121,19 @@ async function run(wasmBytes: Uint8Array) {
     // module doesn't import one; also allow the module to bring its own.
     const instance = await WebAssembly.instantiate(wasmBytes, {
       ...imports,
-      wasi_unstable: imports.wasi_snapshot_preview1
+      wasi_snapshot_preview1: {
+        ...imports.wasi_snapshot_preview1,
+        memory: ref.mem
+      },
+      wasi_unstable: {
+        ...imports.wasi_snapshot_preview1,
+        memory: ref.mem
+      }
     })
     const exp = instance.exports as any
     if (exp.memory) ref.mem = exp.memory
     if (typeof exp._start === 'function') exp._start()
+    if (running) { running = false; post({ type: 'exit', code: 0 }) }
     else if (typeof exp.main === 'function') {
       const code = exp.main()
       if (running) { running = false; post({ type: 'exit', code }) }
