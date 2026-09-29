@@ -68,22 +68,69 @@ export default function Landing({ onOpenEditor, theme, onToggleTheme }: LandingP
 
   return (
     <div className="landing">
+      <div className="lp-bg" aria-hidden="true">
+        <span className="lp-orb lp-orb-a" />
+        <span className="lp-orb lp-orb-b" />
+        <span className="lp-grid" />
+      </div>
+
+      <header className="lp-nav">
+        <span className="lp-logo"><span className="logo-mark">C++</span>CppPad</span>
+        <a className="lp-nav-link" href="https://github.com/Reaobaka56" target="_blank" rel="noreferrer">GitHub</a>
+      </header>
+
       <main className="landing-inner">
         <section className="landing-copy-block">
-          <h1 className="landing-title">CppPad</h1>
-          <p className="landing-byline">by NullEntity</p>
-          <p className="landing-copy">A C++ editor that compiles with GCC in your browser.</p>
+          <span className="lp-badge"><i /> GCC · runs in your browser</span>
+          <h1 className="landing-title">Write C++.<br /><span className="grad">Run it anywhere.</span></h1>
+          <p className="landing-copy">
+            A fast, zero-install C++ playground. Your workspace lives in the browser, compiles with GCC, and prints straight to a real terminal.
+          </p>
 
-          <button type="button" className="btn primary landing-button" onClick={onOpenEditor}>
-            Open editor
-          </button>
+          <div className="lp-cta">
+            <button type="button" className="btn primary landing-button" onClick={onOpenEditor}>
+              Open editor
+              <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M2 6h8M6.5 2.5 10 6l-3.5 3.5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" /></svg>
+            </button>
+            <span className="lp-hint"><kbd>Ctrl</kbd><kbd>↵</kbd> to run</span>
+          </div>
 
-          <p className="landing-disclosure">Your code is sent to Wandbox when you press Run.</p>
+          <ul className="lp-chips" aria-label="Features">
+            {['GCC head', 'Multi-file workspace', 'Persistent storage', 'Light & dark'].map((feature) => (
+              <li key={feature}>{feature}</li>
+            ))}
+          </ul>
         </section>
+
+        <div className="lp-window" aria-hidden="true">
+          <div className="lp-window-bar">
+            <span className="dot r" />
+            <span className="dot y" />
+            <span className="dot g" />
+            <span className="lp-window-title">main.cpp</span>
+          </div>
+          <pre className="lp-code">
+            <code>
+              <span className="ln" style={{ ['--i' as string]: 0 }}><b className="m">#include</b> <b className="s">&lt;iostream&gt;</b></span>
+              <span className="ln" style={{ ['--i' as string]: 1 }}>&nbsp;</span>
+              <span className="ln" style={{ ['--i' as string]: 2 }}><b className="t">int</b> <b className="f">main</b>() {'{'}</span>
+              <span className="ln" style={{ ['--i' as string]: 3 }}>{'    '}<b className="t">std</b>::cout &lt;&lt; <b className="s">"Hello, World!"</b> &lt;&lt; std::endl;</span>
+              <span className="ln" style={{ ['--i' as string]: 4 }}>{'    '}<b className="k">return</b> <b className="n">0</b>;</span>
+              <span className="ln" style={{ ['--i' as string]: 5 }}>{'}'}<i className="caret" /></span>
+            </code>
+          </pre>
+          <div className="lp-out">
+            <span className="lp-out-prompt">$ ./a.out</span>
+            <span className="lp-out-line">Hello, World!</span>
+            <span className="lp-out-meta">Process exited with code 0</span>
+          </div>
+        </div>
+
+        <p className="landing-disclosure">Your active file is sent to Wandbox when you press Run.</p>
 
         <aside className="developer-card" aria-label="Developer profiles">
           <div className="developer-header">
-            <span className="developer-label">Developers</span>
+            <span className="developer-label">Built by</span>
           </div>
 
           <div className="profile-stack" aria-label="Stacked profile images">
@@ -133,7 +180,6 @@ export default function Landing({ onOpenEditor, theme, onToggleTheme }: LandingP
 
           {loadingProfile && !profile && <div className="profile-loading">Loading profile…</div>}
         </aside>
-
       </main>
 
       <footer className="landing-footer">
