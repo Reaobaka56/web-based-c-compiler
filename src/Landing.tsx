@@ -74,6 +74,23 @@ export default function Landing({ onOpenEditor, theme, onToggleTheme }: LandingP
           <p className="landing-byline">by NullEntity</p>
           <p className="landing-copy">A C++ editor that compiles with GCC in your browser.</p>
 
+          <div className="code-preview" aria-label="Sample C++ output preview">
+            <div className="code-preview-bar">
+              <span className="dot r" />
+              <span className="dot y" />
+              <span className="dot g" />
+              <span className="code-file-name">main.cpp</span>
+            </div>
+
+            <pre className="code-preview-body"><code>{`#include <iostream>\nint main() {\n    std::cout << "Hello, World!" << std::endl;\n    return 0;\n}`}</code></pre>
+
+            <div className="code-preview-output">
+              <span className="prompt">$ ./a.out</span>
+              <span className="stdout">Hello, World!</span>
+              <span className="status">Process exited with code 0</span>
+            </div>
+          </div>
+
           <button type="button" className="btn primary landing-button" onClick={onOpenEditor}>
             Open editor
           </button>

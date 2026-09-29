@@ -306,6 +306,86 @@ ul { list-style: none; }
   font: 400 20px/1.5 var(--font-ui);
 }
 
+.code-preview {
+  position: relative;
+  width: min(540px, 100%);
+  margin: 0 auto 24px;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: rgba(24, 27, 34, 0.85);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 22px 40px rgba(0, 0, 0, 0.18);
+  overflow: hidden;
+}
+
+.code-preview::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(135deg, rgba(61, 139, 253, 0.18), rgba(139, 92, 246, 0.09) 36%, transparent 70%);
+  -webkit-mask-image: radial-gradient(circle at 50% 50%, #000 55%, transparent 100%);
+  mask-image: radial-gradient(circle at 50% 50%, #000 55%, transparent 100%);
+  pointer-events: none;
+}
+
+.code-preview-bar {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 32px;
+  padding: 0 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.dot.r { background: #ff5f57; }
+.dot.y { background: #febc2e; }
+.dot.g { background: #28c840; }
+
+.code-file-name {
+  margin-left: 8px;
+  color: var(--muted);
+  font: 11px/1 var(--font-mono);
+}
+
+.code-preview-body {
+  position: relative;
+  z-index: 1;
+  margin: 0;
+  padding: 18px 18px 12px;
+  color: var(--fg);
+  font: 13px/1.7 var(--font-mono);
+  white-space: pre-wrap;
+  word-break: break-word;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.02), rgba(255, 255, 255, 0));
+}
+
+.code-preview-output {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 18px 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.015);
+  color: var(--muted);
+  font: 12px/1.5 var(--font-mono);
+}
+
+.code-preview-output .prompt { color: var(--muted); }
+.code-preview-output .stdout { color: #7fbf7f; }
+.code-preview-output .status { color: var(--muted); }
+
 .landing-button,
 .profile-avatar,
 .landing-toggle,
