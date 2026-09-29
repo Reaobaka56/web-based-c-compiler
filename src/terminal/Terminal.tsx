@@ -9,10 +9,22 @@ export interface TerminalHandle {
   onInput: (cb: (data: string) => void) => void
 }
 
+function cssVar(name: string) {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim()
+}
+
+function currentTheme() {
+  return {
+    background: cssVar('--editor-bg'),
+    foreground: cssVar('--fg'),
+    cursor: cssVar('--fg'),
+    selectionBackground: cssVar('--selection')
+  }
+}
+
 const Terminal = forwardRef<TerminalHandle>(function Terminal(_, ref) {
   const hostRef = useRef<HTMLDivElement>(null)
   const termRef = useRef<XTerm | null>(null)
-  const fitRef = useRef<FitAddon | null>(null)
   const inputCb = useRef<((d: string) => void) | null>(null)
 
   useEffect(() => {
@@ -21,34 +33,34 @@ const Terminal = forwardRef<TerminalHandle>(function Terminal(_, ref) {
 
     const term = new XTerm({
       cursorBlink: true,
-      fontFamily: 'SFMono-Regular, Cascadia Code, Menlo, monospace',
+      convertEol: true,
+      fontFamily: cssVar('--font-mono'),
       fontSize: 13,
-      theme: {
-        background: '#111722',
-        foreground: '#d8e1f0',
-        cursor: '#81a9ff',
-        selectionBackground: '#7597d844'
-      }
+      theme: currentTheme()
     })
     const fit = new FitAddon()
-    const handleData = (d: string) => inputCb.current?.(d)
 
     term.loadAddon(fit)
     term.open(host)
     fit.fit()
-    term.writeln('\x1b[36mCPP://Web terminal\x1b[0m — output appears here. Input is forwarded to the running program.')
-    term.onData(handleData)
+    term.writeln('\x1b[36mCppPad terminal\x1b[0m — output appears here. Input is forwarded to the running program.')
+    term.onData((d) => inputCb.current?.(d))
 
-    const onResize = () => fit.fit()
-    window.addEventListener('resize', onResize)
+    const resizeObserver = new ResizeObserver(() => fit.fit())
+    resizeObserver.observe(host)
+
+    const themeObserver = new MutationObserver(() => {
+      term.options.theme = currentTheme()
+    })
+    themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] })
+
     termRef.current = term
-    fitRef.current = fit
 
     return () => {
-      window.removeEventListener('resize', onResize)
+      resizeObserver.disconnect()
+      themeObserver.disconnect()
       term.dispose()
       termRef.current = null
-      fitRef.current = null
     }
   }, [])
 

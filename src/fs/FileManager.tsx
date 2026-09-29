@@ -6,9 +6,10 @@ interface Props {
   refreshKey: number
   onOpen: (path: string) => void
   onChanged: () => void
+  onDeleted: (path: string) => void
 }
 
-export default function FileManager({ active, refreshKey, onOpen, onChanged }: Props) {
+export default function FileManager({ active, refreshKey, onOpen, onChanged, onDeleted }: Props) {
   const [files, setFiles] = useState<string[]>([])
 
   const refresh = useCallback(async () => {
@@ -26,21 +27,36 @@ export default function FileManager({ active, refreshKey, onOpen, onChanged }: P
     onChanged(); onOpen(name)
   }
 
-  const del = async (e: React.MouseEvent, path: string) => {
-    e.stopPropagation()
-    if (confirm(`Delete ${path}?`)) { await deleteFile(path); onChanged() }
+  const del = async (path: string) => {
+    if (confirm(`Delete ${path}?`)) {
+      await deleteFile(path)
+      onDeleted(path)
+      onChanged()
+    }
   }
 
   return (
-    <div>
-      <h3>Explorer</h3>
-      <button className="btn" style={{ width: '100%', marginBottom: 8 }} onClick={newFile}>＋ New File</button>
-      {files.map((f) => (
-        <div key={f} className={'file-row' + (f === active ? ' active' : '')} onClick={() => onOpen(f)}>
-          📄 {f.replace(/^\//, '')}
-          <span className="del" onClick={(e) => del(e, f)}>✕</span>
-        </div>
-      ))}
-    </div>
+    <nav className="explorer" aria-label="Files">
+      <div className="pane-head">
+        <span>Files</span>
+        <button className="icon-btn" onClick={newFile} title="New file" aria-label="New file">
+          <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
+            <path d="M7 2v10M2 7h10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+          </svg>
+        </button>
+      </div>
+      <ul className="file-list">
+        {files.map((f) => (
+          <li key={f} className={'file-item' + (f === active ? ' active' : '')}>
+            <button className="file-row" onClick={() => onOpen(f)}>{f.replace(/^\//, '')}</button>
+            <button className="row-del" onClick={() => del(f)} title={`Delete ${f}`} aria-label={`Delete ${f}`}>
+              <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true">
+                <path d="M2 2l6 6M8 2l-6 6" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+              </svg>
+            </button>
+          </li>
+        ))}
+      </ul>
+    </nav>
   )
 }
