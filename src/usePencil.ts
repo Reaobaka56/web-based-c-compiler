@@ -10,13 +10,14 @@ type Point = { x: number; y: number }
 
 type Stroke = {
   points: Point[]
-  alpha: number
+  startedAt: number
   width: number
 }
 
+const DRAW_DURATION_MS = 5000
 const isInteractiveTarget = (target: EventTarget | null) => {
   if (!(target instanceof Element)) return false
-  return Boolean(target.closest('button, a, .landing-toggle, .landing-button, .status-btn'))
+  return Boolean(target.closest('button, a, .landing-toggle, .landing-button, .status-btn, .profile-avatar'))
 }
 
 export function usePencil({ containerRef, canvasRef, pencilRef }: UsePencilOptions) {
@@ -57,12 +58,17 @@ export function usePencil({ containerRef, canvasRef, pencilRef }: UsePencilOptio
 
     const drawStroke = (stroke: Stroke) => {
       if (stroke.points.length === 0) return
+
+      const elapsed = performance.now() - stroke.startedAt
+      const alpha = Math.max(0, 1 - elapsed / DRAW_DURATION_MS)
+      if (alpha <= 0) return
+
       const muted = getComputedStyle(document.documentElement).getPropertyValue('--muted').trim() || '#8e929c'
       ctx.lineCap = 'round'
       ctx.lineJoin = 'round'
       ctx.strokeStyle = muted
       ctx.lineWidth = stroke.width
-      ctx.globalAlpha = stroke.alpha
+      ctx.globalAlpha = alpha
 
       const [first, ...rest] = stroke.points
       ctx.beginPath()
@@ -95,8 +101,7 @@ export function usePencil({ containerRef, canvasRef, pencilRef }: UsePencilOptio
       for (let i = strokes.length - 1; i >= 0; i -= 1) {
         const stroke = strokes[i]
         drawStroke(stroke)
-        stroke.alpha *= 0.92
-        if (stroke.alpha < 0.04) {
+        if (performance.now() - stroke.startedAt >= DRAW_DURATION_MS) {
           strokes.splice(i, 1)
         }
       }
@@ -110,8 +115,8 @@ export function usePencil({ containerRef, canvasRef, pencilRef }: UsePencilOptio
 
     const addStroke = (from: Point, to: Point) => {
       const distance = Math.hypot(to.x - from.x, to.y - from.y)
-      const width = 1.15 + Math.min(distance * 0.045, 2.2)
-      strokes.push({ points: [from, to], alpha: 0.82, width })
+      const width = 1.2 + Math.min(distance * 0.05, 2.2)
+      strokes.push({ points: [from, to], startedAt: performance.now(), width })
       if (!rafId) {
         rafId = window.requestAnimationFrame(animate)
       }
@@ -147,12 +152,14 @@ export function usePencil({ containerRef, canvasRef, pencilRef }: UsePencilOptio
 
     resizeCanvas()
     hidePencil()
+    container.style.cursor = 'none'
 
     container.addEventListener('pointermove', handleMove)
     container.addEventListener('pointerleave', handleLeave)
     window.addEventListener('resize', resizeCanvas)
 
     return () => {
+      container.style.cursor = ''
       container.removeEventListener('pointermove', handleMove)
       container.removeEventListener('pointerleave', handleLeave)
       window.removeEventListener('resize', resizeCanvas)

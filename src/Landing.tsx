@@ -1,4 +1,4 @@
-import { useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { usePencil } from './usePencil'
 
 type LandingProps = {
@@ -6,6 +6,23 @@ type LandingProps = {
   theme: 'dark' | 'light'
   onToggleTheme: () => void
 }
+
+type GitHubProfile = {
+  login: string
+  name: string
+  bio: string | null
+  public_repos: number
+  followers: number
+  following: number
+  html_url: string
+  avatar_url: string
+}
+
+const DEV_TEAM = [
+  'Reaobaka56',
+  'Reginald8712',
+  'kelebohilemonaheng-code',
+]
 
 const PENCIL_SVG = `
   <svg viewBox="0 0 30 12" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
@@ -23,8 +40,46 @@ export default function Landing({ onOpenEditor, theme, onToggleTheme }: LandingP
   const landingRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const pencilRef = useRef<HTMLDivElement>(null)
+  const [profile, setProfile] = useState<GitHubProfile | null>(null)
+  const [loadingProfile, setLoadingProfile] = useState(false)
 
   usePencil({ containerRef: landingRef, canvasRef, pencilRef })
+
+  useEffect(() => {
+    const closeOnOutsideClick = (event: MouseEvent) => {
+      const target = event.target as HTMLElement | null
+      if (!target || !target.closest('.profile-popover')) return
+      if (!target.closest('.profile-avatar')) {
+        setProfile(null)
+      }
+    }
+
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setProfile(null)
+    }
+
+    window.addEventListener('pointerdown', closeOnOutsideClick)
+    window.addEventListener('keydown', closeOnEscape)
+
+    return () => {
+      window.removeEventListener('pointerdown', closeOnOutsideClick)
+      window.removeEventListener('keydown', closeOnEscape)
+    }
+  }, [])
+
+  const openProfile = async (login: string) => {
+    setLoadingProfile(true)
+    try {
+      const response = await fetch(`https://api.github.com/users/${login}`)
+      if (!response.ok) throw new Error('GitHub profile unavailable')
+      const data = (await response.json()) as GitHubProfile
+      setProfile(data)
+    } catch {
+      setProfile(null)
+    } finally {
+      setLoadingProfile(false)
+    }
+  }
 
   return (
     <div className="landing" ref={landingRef}>
@@ -37,14 +92,74 @@ export default function Landing({ onOpenEditor, theme, onToggleTheme }: LandingP
       />
 
       <main className="landing-inner">
-        <h1 className="landing-title">CppPad</h1>
-        <p className="landing-copy">A C++ editor that compiles with GCC in your browser.</p>
+        <section className="landing-copy-block">
+          <h1 className="landing-title">CppPad</h1>
+          <p className="landing-copy">A C++ editor that compiles with GCC in your browser.</p>
 
-        <button type="button" className="btn primary landing-button" onClick={onOpenEditor}>
-          Open editor
-        </button>
+          <button type="button" className="btn primary landing-button" onClick={onOpenEditor}>
+            Open editor
+          </button>
 
-        <p className="landing-disclosure">Your code is sent to Wandbox when you press Run.</p>
+          <p className="landing-disclosure">Your code is sent to Wandbox when you press Run.</p>
+        </section>
+
+        <aside className="developer-card" aria-label="Developer profiles">
+          <div className="developer-header">
+            <span className="developer-label">Developers</span>
+          </div>
+
+          <div className="profile-stack" aria-label="Stacked profile images">
+            {DEV_TEAM.map((login, index) => (
+              <button
+                key={login}
+                type="button"
+                className="profile-avatar"
+                style={{ zIndex: DEV_TEAM.length - index }}
+                onClick={() => void openProfile(login)}
+                aria-label={`Open profile for ${login}`}
+                title={login}
+              >
+                <img src={`https://github.com/${login}.png?size=120`} alt={login} />
+              </button>
+            ))}
+          </div>
+
+          <div className="developer-meta">
+            <strong>Reaobaka56</strong>
+            <span>Compiler workflow</span>
+          </div>
+
+          {profile && (
+            <div className="profile-popover" role="dialog" aria-live="polite">
+              <div className="profile-popover-head">
+                <img src={profile.avatar_url} alt={profile.login} />
+                <div>
+                  <strong>{profile.name || profile.login}</strong>
+                  <a href={profile.html_url} target="_blank" rel="noreferrer">@{profile.login}</a>
+                </div>
+              </div>
+
+              <p>{profile.bio || 'Developer profile'}</p>
+
+              <div className="profile-stats">
+                <div>
+                  <span>Repos</span>
+                  <strong>{profile.public_repos}</strong>
+                </div>
+                <div>
+                  <span>Followers</span>
+                  <strong>{profile.followers}</strong>
+                </div>
+                <div>
+                  <span>Following</span>
+                  <strong>{profile.following}</strong>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {loadingProfile && !profile && <div className="profile-loading">Loading profile…</div>}
+        </aside>
 
         <footer className="landing-footer">
           <span className="landing-footer-text">© 2026 NullEntity · CMPG 172 Project</span>
