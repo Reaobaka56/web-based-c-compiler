@@ -24,13 +24,9 @@ function currentTheme() {
 
 const Terminal = forwardRef<TerminalHandle>(function Terminal(_, ref) {
   const hostRef = useRef<HTMLDivElement>(null)
-  const
-  
+  const termRef = useRef<XTerm | null>(null)
+  const inputCb = useRef<((data: string) => void) | null>(null)
 
-
-
-
-  
   useEffect(() => {
     const host = hostRef.current
     if (!host) return
