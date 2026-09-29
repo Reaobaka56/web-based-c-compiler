@@ -16,6 +16,9 @@ const Terminal = forwardRef<TerminalHandle>(function Terminal(_, ref) {
   const inputCb = useRef<((d: string) => void) | null>(null)
 
   useEffect(() => {
+    const host = hostRef.current
+    if (!host) return
+
     const term = new XTerm({
       cursorBlink: true,
       fontFamily: 'SFMono-Regular, Cascadia Code, Menlo, monospace',
@@ -28,16 +31,25 @@ const Terminal = forwardRef<TerminalHandle>(function Terminal(_, ref) {
       }
     })
     const fit = new FitAddon()
+    const handleData = (d: string) => inputCb.current?.(d)
+
     term.loadAddon(fit)
-    term.open(hostRef.current!)
+    term.open(host)
     fit.fit()
     term.writeln('\x1b[36mCPP://Web terminal\x1b[0m — output appears here. Input is forwarded to the running program.')
-    term.onData((d) => inputCb.current?.(d))
+    term.onData(handleData)
+
     const onResize = () => fit.fit()
     window.addEventListener('resize', onResize)
     termRef.current = term
     fitRef.current = fit
-    return () => { window.removeEventListener('resize', onResize); term.dispose() }
+
+    return () => {
+      window.removeEventListener('resize', onResize)
+      term.dispose()
+      termRef.current = null
+      fitRef.current = null
+    }
   }, [])
 
   useImperativeHandle(ref, () => ({
