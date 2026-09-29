@@ -1,5 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
-import { usePencil } from './usePencil'
+import { useEffect, useState } from 'react'
 
 type LandingProps = {
   onOpenEditor: () => void
@@ -24,26 +23,9 @@ const DEV_TEAM = [
   'kelebohilemonaheng-code',
 ]
 
-const PENCIL_SVG = `
-  <svg viewBox="0 0 30 12" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-    <path d="M1 10.5 L10 2.5 L19 2.5 L28 10.5 L19 10.5 L17 12 L9 12 L7 10.5 Z" fill="var(--chrome-bg)" stroke="var(--fg)" stroke-width="0.8" stroke-linejoin="round"/>
-    <path d="M18.5 2.5 L28 1.5 L25.2 4.5 Z" fill="var(--muted)"/>
-    <path d="M9 2.5 L17 2.5 L17 10.5 L9 10.5 Z" fill="var(--editor-bg)"/>
-    <path d="M0.8 10.5 L9.2 2.1 L10.3 2.8 L2.2 10.5 Z" fill="var(--muted)" opacity="0.7"/>
-    <rect x="17.5" y="2.1" width="9.2" height="2" rx="0.7" fill="var(--fg)" opacity="0.9"/>
-    <path d="M18.8 3.6 L28.8 2.4 L27.4 4.5 Z" fill="var(--muted)"/>
-    <path d="M2 10.5 L7.5 10.5 L6.4 12 L1 12 Z" fill="var(--fg)" opacity="0.7"/>
-  </svg>
-`
-
 export default function Landing({ onOpenEditor, theme, onToggleTheme }: LandingProps) {
-  const landingRef = useRef<HTMLDivElement>(null)
-  const canvasRef = useRef<HTMLCanvasElement>(null)
-  const pencilRef = useRef<HTMLDivElement>(null)
   const [profile, setProfile] = useState<GitHubProfile | null>(null)
   const [loadingProfile, setLoadingProfile] = useState(false)
-
-  usePencil({ containerRef: landingRef, canvasRef, pencilRef })
 
   useEffect(() => {
     const closeOnOutsideClick = (event: MouseEvent) => {
@@ -85,18 +67,11 @@ export default function Landing({ onOpenEditor, theme, onToggleTheme }: LandingP
   }
 
   return (
-    <div className="landing" ref={landingRef}>
-      <canvas ref={canvasRef} className="landing-canvas" aria-hidden="true" />
-      <div
-        ref={pencilRef}
-        className="landing-pencil"
-        aria-hidden="true"
-        dangerouslySetInnerHTML={{ __html: PENCIL_SVG }}
-      />
-
+    <div className="landing">
       <main className="landing-inner">
         <section className="landing-copy-block">
           <h1 className="landing-title">CppPad</h1>
+          <p className="landing-byline">by NullEntity</p>
           <p className="landing-copy">A C++ editor that compiles with GCC in your browser.</p>
 
           <button type="button" className="btn primary landing-button" onClick={onOpenEditor}>
@@ -125,11 +100,6 @@ export default function Landing({ onOpenEditor, theme, onToggleTheme }: LandingP
                 <img src={`https://github.com/${login}.png?size=120`} alt={login} />
               </button>
             ))}
-          </div>
-
-          <div className="developer-meta">
-            <strong>Reaobaka56</strong>
-            <span>Compiler workflow</span>
           </div>
 
           {profile && (
