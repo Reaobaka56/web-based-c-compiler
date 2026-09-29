@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import Landing from './Landing'
 import FileManager from './fs/FileManager'
 import Editor from './editor/Editor'
 import Terminal, { TerminalHandle } from './terminal/Terminal'
@@ -16,6 +17,7 @@ export default function App() {
   const [files, setFiles] = useState<Record<string, string>>({})
   const [openTabs, setOpenTabs] = useState<string[]>([])
   const [active, setActive] = useState<string | null>(null)
+  const [showLanding, setShowLanding] = useState(true)
   const [refreshKey, setRefreshKey] = useState(0)
   const [busy, setBusy] = useState(false)
   const [cursor, setCursor] = useState({ line: 1, col: 1 })
@@ -108,6 +110,14 @@ export default function App() {
 
   const toggleTheme = () => setTheme((theme) => (theme === 'dark' ? 'light' : 'dark'))
 
+  const openEditor = useCallback(() => {
+    const target = files['/main.cpp'] !== undefined ? '/main.cpp' : Object.keys(files).sort()[0] ?? null
+    if (!target) return
+    setOpenTabs((tabs) => (tabs.includes(target) ? tabs : [target]))
+    setActive(target)
+    setShowLanding(false)
+  }, [files])
+
   const startResize = (e: React.PointerEvent<HTMLDivElement>) => {
     e.currentTarget.setPointerCapture(e.pointerId)
     const move = (ev: PointerEvent) => {
@@ -120,6 +130,10 @@ export default function App() {
     }
     window.addEventListener('pointermove', move)
     window.addEventListener('pointerup', up)
+  }
+
+  if (showLanding) {
+    return <Landing onOpenEditor={openEditor} theme={theme} onToggleTheme={toggleTheme} />
   }
 
   return (
