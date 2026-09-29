@@ -45,7 +45,23 @@ const DEFAULT_PROJECT: Record<string, string> = {
     '#include <iostream>',
     '',
     'int main() {',
-    '    std::cout << "Hello, World!" << std::endl;',
+    '    std::cout << "Hello from CPP://Web!" << std::endl;',
+    '    std::cout << "Toolchain check: edit me and press Run." << std::endl;',
+    '    return 0;',
+    '}',
+    ''
+  ].join('\n'),
+  '/gui_demo.cpp': [
+    'extern "C" {',
+    '    void gui_clear(int r, int g, int b);',
+    '    void gui_rect(int x, int y, int w, int h, int r, int g, int b);',
+    '    void gui_circle(int x, int y, int radius, int r, int g, int b);',
+    '}',
+    '',
+    'int main() {',
+    '    gui_clear(24, 30, 42);',
+    '    gui_rect(80, 80, 220, 120, 61, 139, 253);',
+    '    gui_circle(400, 240, 55, 224, 175, 104);',
     '    return 0;',
     '}',
     ''
@@ -56,5 +72,22 @@ export async function ensureDefaultProject(): Promise<void> {
   const existing = await listFiles()
   if (existing.length === 0) {
     for (const [p, c] of Object.entries(DEFAULT_PROJECT)) await writeFile(p, c)
+    return
+  }
+
+  const oldStarter = [
+    '#include <iostream>',
+    '',
+    'int main() {',
+    '    std::cout << "Hello, World!" << std::endl;',
+    '    return 0;',
+    '}',
+    ''
+  ].join('\n')
+  if (existing.includes('/main.cpp') && await readFile('/main.cpp') === oldStarter) {
+    await writeFile('/main.cpp', DEFAULT_PROJECT['/main.cpp'])
+  }
+  if (!existing.includes('/gui_demo.cpp')) {
+    await writeFile('/gui_demo.cpp', DEFAULT_PROJECT['/gui_demo.cpp'])
   }
 }

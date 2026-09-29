@@ -2,10 +2,8 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import FileManager from './fs/FileManager'
 import Editor from './editor/Editor'
 import Terminal, { TerminalHandle } from './terminal/Terminal'
-import CanvasWindow, { GuiMessage } from './gui/CanvasWindow'
 import { ensureDefaultProject, readAll, writeFile } from './fs/vfs'
-import { compileProject, toolchainStatus } from './compiler/clang'
-import { WorkerHost } from './runner/WorkerHost'
+import { compileProject } from './compiler/clang'
 
 const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform)
 const RUN_HINT = isMac ? '⌘↵' : 'Ctrl+Enter'
@@ -19,10 +17,7 @@ export default function App() {
   const [openTabs, setOpenTabs] = useState<string[]>([])
   const [active, setActive] = useState<string | null>(null)
   const [refreshKey, setRefreshKey] = useState(0)
-  const [tcStatus, setTcStatus] = useState<'checking' | 'demo' | 'ready'>('checking')
   const [busy, setBusy] = useState(false)
-  const [guiOpen, setGuiOpen] = useState(false)
-  const [guiOp, setGuiOp] = useState<GuiMessage | null>(null)
   const [cursor, setCursor] = useState({ line: 1, col: 1 })
   const [panelHeight, setPanelHeight] = useState(220)
   const [theme, setTheme] = useState<Theme>(() => {
@@ -30,7 +25,7 @@ export default function App() {
     return saved === 'light' || saved === 'dark' ? saved : 'dark'
   })
   const termRef = useRef<TerminalHandle>(null)
-  const hostRef = useRef<WorkerHost | null>(null)
+  const abortRef = useRef<AbortController | null>(null)
   const filesRef = useRef(files)
   filesRef.current = files
 
@@ -44,12 +39,10 @@ export default function App() {
       await ensureDefaultProject()
       const all = await readAll()
       setFiles(all)
-      const first = Object.keys(all).sort()[0]
+      const first = all['/main.cpp'] !== undefined ? '/main.cpp' : Object.keys(all).sort()[0]
       if (first) { setOpenTabs([first]); setActive(first) }
-      const st = await toolchainStatus()
-      setTcStatus(st.ready ? 'ready' : 'demo')
     })()
-    return () => hostRef.current?.kill()
+    return () => abortRef.current?.abort()
   }, [])
 
   const log = useCallback((s: string) => termRef.current?.write(s), [])
@@ -85,36 +78,32 @@ export default function App() {
     if (!active || busy) return
     setBusy(true)
     termRef.current?.clear()
+    const controller = new AbortController()
+    abortRef.current = controller
     try {
-      await writeFile(active, filesRef.current[active] ?? '')
-      const wasm = await compileProject(filesRef.current, log)
-      hostRef.current ??= new WorkerHost()
-      hostRef.current.run(wasm, {
-        onStdout: (d) => termRef.current?.write(d),
-        onGui: (m) => { setGuiOpen(true); setGuiOp(m as GuiMessage) },
-        onExit: (code) => {
-          log(`\x1b[2mProcess exited with code ${code}\x1b[0m\r\n`)
-          setBusy(false)
-        }
-      })
+      log('\x1b[2mCompiling and running with Wandbox (GCC)...\x1b[0m\r\n')
+      const result = await compileProject(filesRef.current[active] ?? '', controller.signal)
+      if (result.compilerOutput) log(result.compilerOutput.replace(/\n/g, '\r\n'))
+      if (result.compilerError) log(`\x1b[31m${result.compilerError.replace(/\n/g, '\r\n')}\x1b[0m`)
+      if (result.output) log(result.output.replace(/\n/g, '\r\n'))
+      if (result.programError) log(`\x1b[31m${result.programError.replace(/\n/g, '\r\n')}\x1b[0m`)
+      log(`\x1b[2mProcess exited with code ${result.status}\x1b[0m\r\n`)
     } catch (e: any) {
-      log(`\x1b[31mCompile error: ${e?.message ?? e}\x1b[0m\r\n`)
-      setBusy(false)
+      if (!controller.signal.aborted) log(`\x1b[31mCompile error: ${e?.message ?? e}\x1b[0m\r\n`)
+    } finally {
+      if (abortRef.current === controller) {
+        abortRef.current = null
+        setBusy(false)
+      }
     }
   }, [active, busy, log])
 
   const stop = useCallback(() => {
-    hostRef.current?.kill()
+    abortRef.current?.abort()
+    abortRef.current = null
     setBusy(false)
     log('\x1b[2mStopped\x1b[0m\r\n')
   }, [log])
-
-  useEffect(() => {
-    termRef.current?.onInput((d) => {
-      if (d === '\r') hostRef.current?.sendStdin('\n')
-      else hostRef.current?.sendStdin(d)
-    })
-  }, [])
 
   const toggleTheme = () => setTheme((theme) => (theme === 'dark' ? 'light' : 'dark'))
 
@@ -131,14 +120,6 @@ export default function App() {
     window.addEventListener('pointermove', move)
     window.addEventListener('pointerup', up)
   }
-
-  const compilerLabel = tcStatus === 'checking' ? 'Checking compiler…'
-    : tcStatus === 'ready' ? 'clang (wasm32)'
-    : 'Demo build: no compiler installed'
-
-  const compilerTitle = tcStatus === 'demo'
-    ? 'Run executes a built-in Hello, World! program, not your code. See the README to install a wasm-clang toolchain.'
-    : undefined
 
   return (
     <div className="app">
@@ -197,7 +178,7 @@ export default function App() {
 
       <footer className="statusbar">
         <div className="status-group">
-          <span className={'status-item compiler ' + tcStatus} title={compilerTitle}>{compilerLabel}</span>
+          <span className="status-item compiler online" title="Your active source file is sent to Wandbox for compilation and execution.">C++ compiler: Wandbox GCC</span>
           {busy && <span className="status-item">Running</span>}
         </div>
         <div className="status-group">
@@ -208,8 +189,6 @@ export default function App() {
           </button>
         </div>
       </footer>
-
-      {guiOpen && <CanvasWindow title="Canvas, 640×480" onClose={() => setGuiOpen(false)} op={guiOp} />}
     </div>
   )
 }

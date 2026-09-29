@@ -254,6 +254,7 @@ ul { list-style: none; }
 .status-btn:hover { color: var(--fg); background: var(--hover); }
 .compiler.demo { color: var(--warn); }
 .compiler.ready { color: var(--ok); }
+.compiler.online { color: var(--ok); }
 
 .gui-wrap {
   position: fixed;

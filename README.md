@@ -1,8 +1,6 @@
 # CppPad: C++ in the browser
 
-A C++ IDE that runs entirely in the browser: editor, file manager (IndexedDB),
-in-browser compilation via wasm-clang, execution in a sandboxed Web Worker
-(WASI shim), terminal I/O, and a canvas window for GUI programs.
+A browser-based C++ editor with a file manager (IndexedDB) and online compile-and-run.
 
 ## Quick start
 
@@ -11,31 +9,15 @@ npm install
 npm run dev
 ```
 
-Until a toolchain is installed the app runs as a **demo build**: pressing Run
-executes a built-in Hello, World! program through the full pipeline (compile →
-link → worker → WASI → terminal), so you can verify the architecture immediately.
+Press Run to compile and execute the active C++ file with GCC through the
+[Wandbox API](https://wandbox.org/). The output and compiler diagnostics appear
+in the terminal. During local development Vite proxies the API request; on
+Vercel, `api/compile.ts` provides the proxy endpoint.
 
-## Enable REAL C++ compilation
-
-The Clang/LLVM toolchain (~50MB+) is too large to ship in this repo. To enable:
-
-1. Download a wasm-clang build (e.g. https://github.com/binji/wasm-clang
-   or any fork shipping a wasm32 clang + wasm-ld + sysroot).
-2. Copy these files into `public/toolchain/`:
-   - `clang.wasm` — the compiler
-   - `wasm-ld.wasm` — the linker
-   - `sysroot/` — libc/libc++ headers and libraries for wasm32
-3. Restart the dev server. The status bar changes from "Demo build" to "clang (wasm32)".
-
-Then wire your build's loading API into `src/compiler/clang.ts`
-(`compileProject`) — the function is annotated with the exact pipeline:
-per-TU compile to `.o`, then `wasm-ld` into `a.out.wasm`, returned as bytes.
-
-## GUI programs
-
-Programs using the SDL2 or raylib Emscripten ports call C functions that map
-to canvas operations through the worker's `env` imports. The canvas window is
-still draggable and receives ops via postMessage.
+The source file is sent to Wandbox for compilation and execution. Do not use
+this service for confidential code. This version compiles one active source file
+at a time; interactive stdin and the GUI drawing example are not supported by
+the online runner.
 
 ## Architecture
 
@@ -45,9 +27,10 @@ src/
 ├── editor/Editor.tsx       CodeMirror 6 (C++ syntax, theme-aware)
 ├── fs/vfs.ts               IndexedDB-backed virtual file system
 ├── fs/FileManager.tsx      explorer: create/delete/open
-├── compiler/clang.ts       toolchain status + demo fallback
-├── runner/WorkerHost.ts    worker lifecycle
-├── runner/program.worker.ts  WASI preview1 shim + instantiation
+├── compiler/clang.ts       online compiler API client
+├── api/compile.ts          Vercel proxy to Wandbox GCC
+├── runner/WorkerHost.ts    worker lifecycle (legacy)
+├── runner/program.worker.ts  WASI preview1 shim (legacy)
 ├── terminal/Terminal.tsx   xterm.js console
 └── gui/CanvasWindow.tsx    draggable canvas for GUI output
 ```
