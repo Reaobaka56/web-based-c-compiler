@@ -64,17 +64,17 @@ export function usePencil({ containerRef, canvasRef, pencilRef }: UsePencilOptio
       ctx.lineWidth = stroke.width
       ctx.globalAlpha = stroke.alpha
 
-      const [start, ...rest] = stroke.points
+      const [first, ...rest] = stroke.points
       ctx.beginPath()
-      ctx.moveTo(start.x, start.y)
+      ctx.moveTo(first.x, first.y)
 
+      let previous = first
       for (let i = 0; i < rest.length; i += 1) {
         const next = rest[i]
-        const midX = (start.x + next.x) / 2
-        const midY = (start.y + next.y) / 2
-        ctx.quadraticCurveTo(start.x, start.y, midX, midY)
-        start.x = next.x
-        start.y = next.y
+        const midX = (previous.x + next.x) / 2
+        const midY = (previous.y + next.y) / 2
+        ctx.quadraticCurveTo(previous.x, previous.y, midX, midY)
+        previous = next
       }
 
       const finalPoint = stroke.points[stroke.points.length - 1]
