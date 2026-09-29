@@ -16,18 +16,18 @@ export default function App() {
   const [files, setFiles] = useState<Record<string, string>>({})
   const [openTabs, setOpenTabs] = useState<string[]>([])
   const [active, setActive] = useState<string | null>(null)
-  const [showHome, setShowHome] = useState(true)
-  const [projectLoaded, setProjectLoaded] = useState(false)
   const [refreshKey, setRefreshKey] = useState(0)
   const [busy, setBusy] = useState(false)
   const [cursor, setCursor] = useState({ line: 1, col: 1 })
   const [panelHeight, setPanelHeight] = useState(220)
+  const [pencil, setPencil] = useState({ x: 0, y: 0, visible: false })
   const [theme, setTheme] = useState<Theme>(() => {
     const saved = document.documentElement.getAttribute('data-theme') as Theme | null
     return saved === 'light' || saved === 'dark' ? saved : 'dark'
   })
   const termRef = useRef<TerminalHandle>(null)
   const abortRef = useRef<AbortController | null>(null)
+  const scribbleCanvasRef = useRef<HTMLCanvasElement | null>(null)
   const filesRef = useRef(files)
   filesRef.current = files
 
@@ -37,11 +37,85 @@ export default function App() {
   }, [theme])
 
   useEffect(() => {
+    const canvas = scribbleCanvasRef.current
+    if (!canvas) return
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+    const strokes: Array<{ x: number; y: number; x2: number; y2: number; alpha: number; width: number }> = []
+    let rafId = 0
+
+    const resize = () => {
+      const ratio = window.devicePixelRatio || 1
+      canvas.width = Math.floor(window.innerWidth * ratio)
+      canvas.height = Math.floor(window.innerHeight * ratio)
+      canvas.style.width = `${window.innerWidth}px`
+      canvas.style.height = `${window.innerHeight}px`
+      ctx.setTransform(ratio, 0, 0, ratio, 0, 0)
+    }
+
+    const render = () => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height)
+      for (let i = strokes.length - 1; i >= 0; i--) {
+        const stroke = strokes[i]
+        ctx.beginPath()
+        ctx.lineWidth = stroke.width
+        ctx.strokeStyle = `rgba(108, 164, 255, ${stroke.alpha})`
+        ctx.moveTo(stroke.x, stroke.y)
+        ctx.lineTo(stroke.x2, stroke.y2)
+        ctx.stroke()
+        stroke.alpha *= 0.95
+        if (stroke.alpha < 0.04) strokes.splice(i, 1)
+      }
+      rafId = requestAnimationFrame(render)
+    }
+
+    const addStroke = (x: number, y: number, x2: number, y2: number) => {
+      strokes.push({ x, y, x2, y2, alpha: 0.6, width: 1.5 + Math.random() * 1.8 })
+    }
+
+    const handleMove = (event: PointerEvent) => {
+      const x = event.clientX
+      const y = event.clientY
+      setPencil({ x, y, visible: true })
+      const last = strokes[strokes.length - 1]
+      const driftX = (Math.random() - 0.5) * 18
+      const driftY = (Math.random() - 0.5) * 18
+      if (!last) {
+        addStroke(x, y, x + driftX, y + driftY)
+      } else {
+        addStroke(last.x2, last.y2, x + driftX, y + driftY)
+      }
+    }
+
+    const handleEnter = (event: PointerEvent) => {
+      setPencil({ x: event.clientX, y: event.clientY, visible: true })
+    }
+    const handleLeave = () => setPencil((p) => ({ ...p, visible: false }))
+
+    resize()
+    rafId = requestAnimationFrame(render)
+    window.addEventListener('pointermove', handleMove)
+    window.addEventListener('pointerenter', handleEnter)
+    window.addEventListener('pointerleave', handleLeave)
+    window.addEventListener('resize', resize)
+
+    return () => {
+      cancelAnimationFrame(rafId)
+      window.removeEventListener('pointermove', handleMove)
+      window.removeEventListener('pointerenter', handleEnter)
+      window.removeEventListener('pointerleave', handleLeave)
+      window.removeEventListener('resize', resize)
+    }
+  }, [])
+
+  useEffect(() => {
     ;(async () => {
       await ensureDefaultProject()
       const all = await readAll()
       setFiles(all)
-      setProjectLoaded(true)
+      setRefreshKey((k) => k + 1) // the file list may have mounted before the default project existed
+      const first = all['/main.cpp'] !== undefined ? '/main.cpp' : Object.keys(all).sort()[0]
+      if (first) { setOpenTabs([first]); setActive(first) }
     })()
     return () => abortRef.current?.abort()
   }, [])
@@ -52,7 +126,6 @@ export default function App() {
     setFiles((f) => ({ ...f, [path]: f[path] ?? '' }))
     setOpenTabs((t) => (t.includes(path) ? t : [...t, path]))
     setActive(path)
-    setShowHome(false)
   }, [])
 
   const closeTab = useCallback((path: string) => {
@@ -83,7 +156,7 @@ export default function App() {
     const controller = new AbortController()
     abortRef.current = controller
     try {
-      log('\x1b[2mCompiling and running with Wandbox (GCC)...\x1b[0m\r\n')
+      log('\x1b[2mSending source to Wandbox (GCC)…\x1b[0m\r\n')
       const result = await compileProject(filesRef.current[active] ?? '', controller.signal)
       if (result.compilerOutput) log(result.compilerOutput.replace(/\n/g, '\r\n'))
       if (result.compilerError) log(`\x1b[31m${result.compilerError.replace(/\n/g, '\r\n')}\x1b[0m`)
@@ -123,86 +196,16 @@ export default function App() {
     window.addEventListener('pointerup', up)
   }
 
-  const startPath = files['/main.cpp'] !== undefined ? '/main.cpp' : Object.keys(files).sort()[0]
-  const previewLines = (files['/main.cpp'] ?? '').split('\n').slice(0, 8)
-
   return (
-    <div className="app">
-      {showHome ? (
-        <>
-          <header className="topbar welcome-topbar">
-            <span className="app-name">CppPad</span>
-            <span className="welcome-topbar-label">BROWSER C++ WORKSPACE</span>
-            <span className="welcome-topbar-spacer" />
-            <span className="welcome-topbar-status"><span className="compiler-dot" /> GCC COMPILER</span>
-          </header>
-
-          <main className="welcome-screen">
-            <div className="welcome-inner">
-              <section className="welcome-intro">
-                <p className="welcome-kicker"><span className="compiler-dot" /> YOUR WORKSPACE</p>
-                <h1>CppPad</h1>
-                <p className="welcome-lede">Write, compile, and run C++.</p>
-                <p className="welcome-description">Your project is saved in this browser and ready to open.</p>
-                <div className="welcome-actions">
-                  <button className="btn primary" onClick={() => startPath && void openFile(startPath)} disabled={!projectLoaded || !startPath}>
-                    Open {startPath?.replace(/^\//, '') ?? 'project'}
-                    <span aria-hidden="true">-&gt;</span>
-                  </button>
-                  <span className="welcome-language">C++ / GCC</span>
-                </div>
-              </section>
-
-              <section className="welcome-preview" aria-label="main.cpp preview">
-                <div className="welcome-preview-head">
-                  <span className="compiler-dot" />
-                  <span>main.cpp</span>
-                  <span className="welcome-preview-mode">C++</span>
-                </div>
-                <pre>{projectLoaded ? previewLines.map((line, index) => (
-                  <span className="welcome-code-line" key={index}>
-                    <span className="welcome-line-number">{String(index + 1).padStart(2, '0')}</span>{line || ' '}
-                  </span>
-                )) : <span className="welcome-loading">Loading project...</span>}</pre>
-              </section>
-
-              <section className="welcome-files" aria-labelledby="welcome-files-title">
-                <div className="welcome-files-heading">
-                  <h2 id="welcome-files-title">Project files</h2>
-                  <span>{projectLoaded ? `${Object.keys(files).length} files` : 'Loading'}</span>
-                </div>
-                <ul className="welcome-file-list">
-                  {Object.keys(files).sort().map((path) => (
-                    <li key={path}>
-                      <button className="welcome-file" onClick={() => void openFile(path)}>
-                        <span className="welcome-file-type">C++</span>
-                        <span className="welcome-file-name">{path.replace(/^\//, '')}</span>
-                        <span className="welcome-file-open">Open</span>
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            </div>
-          </main>
-
-          <footer className="statusbar">
-            <div className="status-group">
-              <span className="status-item compiler online">Wandbox GCC</span>
-              <span className="status-item welcome-privacy">Active source is sent to Wandbox on Run</span>
-            </div>
-            <div className="status-group">
-              <span className="status-item copyright">© 2026 NullEntity · CMPG 172 Project</span>
-              <button className="status-item status-btn" onClick={toggleTheme} aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}>
-                {theme === 'dark' ? 'Dark' : 'Light'}
-              </button>
-            </div>
-          </footer>
-        </>
-      ) : (
-        <>
+    <div className="app app-scribble">
+      <canvas ref={scribbleCanvasRef} className="scribble-canvas" aria-hidden="true" />
+      <div
+        className={'pencil-cursor' + (pencil.visible ? ' visible' : '')}
+        style={{ left: pencil.x, top: pencil.y }}
+        aria-hidden="true"
+      />
       <header className="topbar">
-        <button className="app-name" onClick={() => setShowHome(true)} title="Back to home">CppPad</button>
+        <span className="app-name">CppPad</span>
         <div className="run-controls">
           <button className="btn primary" onClick={run} disabled={busy || !active} title={`Run (${RUN_HINT})`}>
             <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><path d="M2 1l7 4-7 4z" fill="currentColor" /></svg>
@@ -238,7 +241,8 @@ export default function App() {
           </div>
 
           <div className="editor-host">
-            {active ? <Editor key={active} value={files[active] ?? ''} onChange={onEdit} onRun={run} onCursor={(line, col) => setCursor({ line, col })} />
+            {active
+              ? <Editor key={active} value={files[active] ?? ''} onChange={onEdit} onRun={run} onCursor={(line, col) => setCursor({ line, col })} />
               : <div className="empty-editor">No file open. Create one with + in the Files list.</div>}
           </div>
 
@@ -256,20 +260,20 @@ export default function App() {
 
       <footer className="statusbar">
         <div className="status-group">
-          <span className="status-item compiler online" title="Your active source file is sent to Wandbox for compilation and execution.">C++ compiler: Wandbox GCC</span>
+          <span className="status-item" title="Your active source file is sent to Wandbox for compilation and execution.">
+            GCC via Wandbox
+          </span>
           {busy && <span className="status-item">Running</span>}
         </div>
         <div className="status-group">
-          <span className="status-item copyright">© 2026 NullEntity · CMPG 172 Project</span>
           <span className="status-item">Ln {cursor.line}, Col {cursor.col}</span>
           <span className="status-item">C++</span>
+          <span className="status-item copyright">© 2026 NullEntity · CMPG 172 Project</span>
           <button className="status-item status-btn" onClick={toggleTheme} aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}>
             {theme === 'dark' ? 'Dark' : 'Light'}
           </button>
         </div>
       </footer>
-        </>
-      )}
     </div>
   )
 }
