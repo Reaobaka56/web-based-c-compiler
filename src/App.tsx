@@ -22,6 +22,8 @@ export default function App() {
   const [busy, setBusy] = useState(false)
   const [cursor, setCursor] = useState({ line: 1, col: 1 })
   const [panelHeight, setPanelHeight] = useState(220)
+  const [showFiles, setShowFiles] = useState(true)
+  const [showTerminal, setShowTerminal] = useState(true)
   const [theme, setTheme] = useState<Theme>(() => {
     const saved = document.documentElement.getAttribute('data-theme') as Theme | null
     return saved === 'light' || saved === 'dark' ? saved : 'dark'
@@ -139,7 +141,20 @@ export default function App() {
   return (
     <div className="app">
       <header className="topbar">
-        <span className="app-name">CppPad</span>
+        <button className="brand" type="button" onClick={() => setShowLanding(true)} aria-label="CppPad home" title="Back to landing page">
+          <svg className="brand-icon" viewBox="0 0 32 32" aria-hidden="true">
+            <rect width="32" height="32" rx="6" fill="currentColor" />
+            <text x="16" y="21" textAnchor="middle" fill="var(--on-accent)" fontFamily="monospace" fontSize="12" fontWeight="700">C++</text>
+          </svg>
+        </button>
+        <nav className="workspace-nav" aria-label="Workspace panels">
+          <button className={'nav-btn' + (showFiles ? ' selected' : '')} type="button" onClick={() => setShowFiles((shown) => !shown)} aria-expanded={showFiles}>
+            Files
+          </button>
+          <button className={'nav-btn' + (showTerminal ? ' selected' : '')} type="button" onClick={() => setShowTerminal((shown) => !shown)} aria-expanded={showTerminal}>
+            Terminal
+          </button>
+        </nav>
         <div className="run-controls">
           <button className="btn primary" onClick={run} disabled={busy || !active} title={`Run (${RUN_HINT})`}>
             <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><path d="M2 1l7 4-7 4z" fill="currentColor" /></svg>
@@ -150,10 +165,15 @@ export default function App() {
             Stop
           </button>
         </div>
+        <button className="theme-toggle" type="button" onClick={toggleTheme} aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`} title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}>
+          {theme === 'dark'
+            ? <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="3" fill="none" stroke="currentColor" strokeWidth="1.4" /><path d="M8 1.5v1.4M8 13.1v1.4M1.5 8h1.4M13.1 8h1.4m-10.1-4.6 1 1m5.2 5.2 1 1m0-7.3-1 1m-5.2 5.2-1 1" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" /></svg>
+            : <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M13.4 10.2A5.9 5.9 0 0 1 5.8 2.6 5.9 5.9 0 1 0 13.4 10.2Z" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" /></svg>}
+        </button>
       </header>
 
       <div className="body">
-        <aside className="sidebar">
+        <aside className={'sidebar' + (showFiles ? '' : ' collapsed')}>
           <FileManager active={active} refreshKey={refreshKey}
             onOpen={openFile} onChanged={() => setRefreshKey((k) => k + 1)} onDeleted={onFileDeleted} />
         </aside>
@@ -180,9 +200,9 @@ export default function App() {
               : <div className="empty-editor">No file open. Create one with + in the Files list.</div>}
           </div>
 
-          <div className="splitter" role="separator" aria-orientation="horizontal" aria-label="Resize terminal" onPointerDown={startResize} />
+          <div className={'splitter' + (showTerminal ? '' : ' collapsed')} role="separator" aria-orientation="horizontal" aria-label="Resize terminal" onPointerDown={startResize} />
 
-          <section className="panel" style={{ height: panelHeight }}>
+          <section className={'panel' + (showTerminal ? '' : ' collapsed')} style={showTerminal ? { height: panelHeight } : undefined}>
             <div className="pane-head">
               <span>Terminal</span>
               <button className="text-btn" onClick={() => termRef.current?.clear()}>Clear</button>
@@ -203,9 +223,6 @@ export default function App() {
           <span className="status-item">Ln {cursor.line}, Col {cursor.col}</span>
           <span className="status-item">C++</span>
           <span className="status-item copyright">© 2026 NullEntity · CMPG 172 Project</span>
-          <button className="status-item status-btn" onClick={toggleTheme} aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}>
-            {theme === 'dark' ? 'Dark' : 'Light'}
-          </button>
         </div>
       </footer>
     </div>

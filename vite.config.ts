@@ -11,11 +11,6 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: () => '/api/compile.json'
       }
-    },
-    headers: {
-      // Required if you later enable std::thread (SharedArrayBuffer)
-      'Cross-Origin-Opener-Policy': 'same-origin',
-      'Cross-Origin-Embedder-Policy': 'require-corp'
     }
   }
 })
