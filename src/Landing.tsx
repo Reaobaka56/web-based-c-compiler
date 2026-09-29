@@ -47,9 +47,12 @@ export default function Landing({ onOpenEditor, theme, onToggleTheme }: LandingP
 
   useEffect(() => {
     const closeOnOutsideClick = (event: MouseEvent) => {
-      const target = event.target as HTMLElement | null
-      if (!target || !target.closest('.profile-popover')) return
-      if (!target.closest('.profile-avatar')) {
+      const target = event.target as Element | null
+      if (!target) return
+
+      const popover = target.closest('.profile-popover')
+      const avatar = target.closest('.profile-avatar')
+      if (!popover && !avatar) {
         setProfile(null)
       }
     }
@@ -73,7 +76,7 @@ export default function Landing({ onOpenEditor, theme, onToggleTheme }: LandingP
       const response = await fetch(`https://api.github.com/users/${login}`)
       if (!response.ok) throw new Error('GitHub profile unavailable')
       const data = (await response.json()) as GitHubProfile
-      setProfile(data)
+      setProfile((current) => (current?.login === login ? null : data))
     } catch {
       setProfile(null)
     } finally {
