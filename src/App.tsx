@@ -139,7 +139,7 @@ export default function App() {
   return (
     <div className="app">
       <header className="topbar">
-        <span className="app-name"><span className="logo-mark">C++</span>CppPad</span>
+        <span className="app-name">CppPad</span>
         <div className="run-controls">
           <button className="btn primary" onClick={run} disabled={busy || !active} title={`Run (${RUN_HINT})`}>
             <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><path d="M2 1l7 4-7 4z" fill="currentColor" /></svg>
