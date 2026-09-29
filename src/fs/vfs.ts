@@ -45,28 +45,10 @@ const DEFAULT_PROJECT: Record<string, string> = {
     '#include <iostream>',
     '',
     'int main() {',
-    '    std::cout << "Hello from CPP://Web!" << std::endl;',
-    '    std::cout << "Toolchain check: edit me and press Run." << std::endl;',
+    '    std::cout << "Hello, World!" << std::endl;',
     '    return 0;',
     '}',
     ''
-  ].join('\n'),
-  '/gui_demo.cpp': [
-    '// Sample GUI program (needs SDL2 Emscripten port — see README).',
-    '// When the real toolchain is installed this renders to the canvas window.',
-    '#include <SDL2/SDL.h>',
-    '',
-    'int main() {',
-    '    SDL_Init(SDL_INIT_VIDEO);',
-    '    SDL_Window* w = SDL_CreateWindow("CPP://Web", 100, 100, 640, 480, 0);',
-    '    SDL_Renderer* r = SDL_CreateRenderer(w, -1, 0);',
-    '    for (int x = 0; x < 640; ++x) {',
-    '        SDL_SetRenderDrawColor(r, x % 256, 100, 200, 255);',
-    '        SDL_RenderDrawLine(r, x, 0, 640 - x, 480);',
-    '        SDL_RenderPresent(r);',
-    '    }',
-    '    return 0;',
-    '}'
   ].join('\n')
 }
 

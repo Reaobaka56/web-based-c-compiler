@@ -43,7 +43,7 @@ export async function toolchainStatus(): Promise<ToolchainStatus> {
   for (const f of needed) {
     try {
       const r = await fetch(`/toolchain/${f}`, { method: 'HEAD' })
-      if (r.ok) found.push(f)
+      if (r.ok && !(r.headers.get('content-type') ?? '').includes('text/html')) found.push(f)
     } catch { /* offline etc. */ }
   }
   return { ready: found.length === needed.length, files: found }
