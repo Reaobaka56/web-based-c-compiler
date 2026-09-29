@@ -16,6 +16,8 @@ export default function App() {
   const [files, setFiles] = useState<Record<string, string>>({})
   const [openTabs, setOpenTabs] = useState<string[]>([])
   const [active, setActive] = useState<string | null>(null)
+  const [showHome, setShowHome] = useState(true)
+  const [projectLoaded, setProjectLoaded] = useState(false)
   const [refreshKey, setRefreshKey] = useState(0)
   const [busy, setBusy] = useState(false)
   const [cursor, setCursor] = useState({ line: 1, col: 1 })
@@ -39,8 +41,7 @@ export default function App() {
       await ensureDefaultProject()
       const all = await readAll()
       setFiles(all)
-      const first = all['/main.cpp'] !== undefined ? '/main.cpp' : Object.keys(all).sort()[0]
-      if (first) { setOpenTabs([first]); setActive(first) }
+      setProjectLoaded(true)
     })()
     return () => abortRef.current?.abort()
   }, [])
@@ -51,6 +52,7 @@ export default function App() {
     setFiles((f) => ({ ...f, [path]: f[path] ?? '' }))
     setOpenTabs((t) => (t.includes(path) ? t : [...t, path]))
     setActive(path)
+    setShowHome(false)
   }, [])
 
   const closeTab = useCallback((path: string) => {
@@ -121,10 +123,86 @@ export default function App() {
     window.addEventListener('pointerup', up)
   }
 
+  const startPath = files['/main.cpp'] !== undefined ? '/main.cpp' : Object.keys(files).sort()[0]
+  const previewLines = (files['/main.cpp'] ?? '').split('\n').slice(0, 8)
+
   return (
     <div className="app">
+      {showHome ? (
+        <>
+          <header className="topbar welcome-topbar">
+            <span className="app-name">CppPad</span>
+            <span className="welcome-topbar-label">BROWSER C++ WORKSPACE</span>
+            <span className="welcome-topbar-spacer" />
+            <span className="welcome-topbar-status"><span className="compiler-dot" /> GCC COMPILER</span>
+          </header>
+
+          <main className="welcome-screen">
+            <div className="welcome-inner">
+              <section className="welcome-intro">
+                <p className="welcome-kicker"><span className="compiler-dot" /> YOUR WORKSPACE</p>
+                <h1>CppPad</h1>
+                <p className="welcome-lede">Write, compile, and run C++.</p>
+                <p className="welcome-description">Your project is saved in this browser and ready to open.</p>
+                <div className="welcome-actions">
+                  <button className="btn primary" onClick={() => startPath && void openFile(startPath)} disabled={!projectLoaded || !startPath}>
+                    Open {startPath?.replace(/^\//, '') ?? 'project'}
+                    <span aria-hidden="true">-&gt;</span>
+                  </button>
+                  <span className="welcome-language">C++ / GCC</span>
+                </div>
+              </section>
+
+              <section className="welcome-preview" aria-label="main.cpp preview">
+                <div className="welcome-preview-head">
+                  <span className="compiler-dot" />
+                  <span>main.cpp</span>
+                  <span className="welcome-preview-mode">C++</span>
+                </div>
+                <pre>{projectLoaded ? previewLines.map((line, index) => (
+                  <span className="welcome-code-line" key={index}>
+                    <span className="welcome-line-number">{String(index + 1).padStart(2, '0')}</span>{line || ' '}
+                  </span>
+                )) : <span className="welcome-loading">Loading project...</span>}</pre>
+              </section>
+
+              <section className="welcome-files" aria-labelledby="welcome-files-title">
+                <div className="welcome-files-heading">
+                  <h2 id="welcome-files-title">Project files</h2>
+                  <span>{projectLoaded ? `${Object.keys(files).length} files` : 'Loading'}</span>
+                </div>
+                <ul className="welcome-file-list">
+                  {Object.keys(files).sort().map((path) => (
+                    <li key={path}>
+                      <button className="welcome-file" onClick={() => void openFile(path)}>
+                        <span className="welcome-file-type">C++</span>
+                        <span className="welcome-file-name">{path.replace(/^\//, '')}</span>
+                        <span className="welcome-file-open">Open</span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            </div>
+          </main>
+
+          <footer className="statusbar">
+            <div className="status-group">
+              <span className="status-item compiler online">Wandbox GCC</span>
+              <span className="status-item welcome-privacy">Active source is sent to Wandbox on Run</span>
+            </div>
+            <div className="status-group">
+              <span className="status-item copyright">© 2026 NullEntity · CMPG 172 Project</span>
+              <button className="status-item status-btn" onClick={toggleTheme} aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}>
+                {theme === 'dark' ? 'Dark' : 'Light'}
+              </button>
+            </div>
+          </footer>
+        </>
+      ) : (
+        <>
       <header className="topbar">
-        <span className="app-name">CppPad</span>
+        <button className="app-name" onClick={() => setShowHome(true)} title="Back to home">CppPad</button>
         <div className="run-controls">
           <button className="btn primary" onClick={run} disabled={busy || !active} title={`Run (${RUN_HINT})`}>
             <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><path d="M2 1l7 4-7 4z" fill="currentColor" /></svg>
@@ -182,6 +260,7 @@ export default function App() {
           {busy && <span className="status-item">Running</span>}
         </div>
         <div className="status-group">
+          <span className="status-item copyright">© 2026 NullEntity · CMPG 172 Project</span>
           <span className="status-item">Ln {cursor.line}, Col {cursor.col}</span>
           <span className="status-item">C++</span>
           <button className="status-item status-btn" onClick={toggleTheme} aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}>
@@ -189,6 +268,8 @@ export default function App() {
           </button>
         </div>
       </footer>
+        </>
+      )}
     </div>
   )
 }
