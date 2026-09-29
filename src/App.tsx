@@ -8,6 +8,7 @@ import { compileProject, toolchainStatus } from './compiler/clang'
 import { WorkerHost } from './runner/WorkerHost'
 
 export default function App() {
+  const [workspaceOpen, setWorkspaceOpen] = useState(false)
   const [files, setFiles] = useState<Record<string, string>>({})
   const [openTabs, setOpenTabs] = useState<string[]>([])
   const [active, setActive] = useState<string | null>(null)
@@ -100,7 +101,72 @@ export default function App() {
       if (d === '\r') hostRef.current?.sendStdin('\n')
       else hostRef.current?.sendStdin(d)
     })
-  }, [])
+  }, [workspaceOpen])
+
+  if (!workspaceOpen) {
+    return (
+      <main className="landing">
+        <div className="landing-wash landing-wash-peach" />
+        <div className="landing-wash landing-wash-lilac" />
+        <div className="landing-grain" />
+        <header className="landing-nav">
+          <a className="landing-brand" href="#home" aria-label="CPP Web home">
+            <span className="landing-mark">{'{;}'}</span>
+            <span>CPP<span className="landing-brand-light">://</span>Web</span>
+          </a>
+          <span className="landing-nav-note"><span className="landing-live-dot" /> C / C++ IN YOUR BROWSER</span>
+        </header>
+
+        <section className="landing-content" id="home">
+          <div className="landing-copy">
+            <span className="landing-eyebrow"><span /> YOUR NEXT IDEA STARTS HERE</span>
+            <h1>Build in C.<br /><span>Right here.</span></h1>
+            <p className="landing-description">A focused C and C++ workspace that lives in your browser. Write, compile, and run your code without breaking your flow.</p>
+            <div className="landing-actions">
+              <button className="landing-cta" onClick={() => setWorkspaceOpen(true)}>
+                Continue to compiler <span aria-hidden="true">-&gt;</span>
+              </button>
+              <span className="landing-no-setup">No setup. Just start.</span>
+            </div>
+            <div className="landing-proof">
+              <span className="landing-proof-icon">C</span>
+              <span><strong>Made for the work</strong><small>Files, terminal, and canvas in one place</small></span>
+            </div>
+          </div>
+
+          <div className="landing-stage" aria-label="Preview of the browser compiler workspace">
+            <div className="landing-orbit landing-orbit-one" />
+            <div className="landing-orbit landing-orbit-two" />
+            <div className="landing-float-chip chip-c">C</div>
+            <div className="landing-float-chip chip-braces">{'{ }'}</div>
+            <div className="landing-preview">
+              <div className="preview-topline">
+                <div className="preview-brand"><span>{'{;}'}</span> CPP://Web</div>
+                <div className="preview-window-dots"><i /><i /><i /></div>
+              </div>
+              <div className="preview-toolbar"><span>⌘ &nbsp; main.c</span><span className="preview-run"><b /> Run</span></div>
+              <div className="preview-editor">
+                <div className="preview-line"><span>01</span><code><i>#include</i> &lt;stdio.h&gt;</code></div>
+                <div className="preview-line"><span>02</span><code /></div>
+                <div className="preview-line"><span>03</span><code><em>int</em> main() {'{'}</code></div>
+                <div className="preview-line"><span>04</span><code>&nbsp;&nbsp;printf(<strong>"Hello, world!\n"</strong>);</code></div>
+                <div className="preview-line"><span>05</span><code>&nbsp;&nbsp;<em>return</em> 0;</code></div>
+                <div className="preview-line"><span>06</span><code>{'}'}</code></div>
+              </div>
+              <div className="preview-console">
+                <div className="preview-console-head"><span>OUTPUT</span><span>RUN COMPLETE</span></div>
+                <code><b>&gt;</b> Hello, world!</code>
+                <small>Process exited successfully <i>0.02s</i></small>
+              </div>
+              <div className="preview-reflection" />
+            </div>
+            <div className="landing-caption"><span /> LIVE WORKSPACE PREVIEW <span className="caption-line" /></div>
+          </div>
+        </section>
+        <footer className="landing-footer"><span>THOUGHTFUL TOOLS FOR YOUR NEXT COMPILE</span><span>COMPILE. RUN. KEEP GOING.</span></footer>
+      </main>
+    )
+  }
 
   return (
     <div className="app">
