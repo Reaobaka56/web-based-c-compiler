@@ -13,7 +13,7 @@ export async function compileProject(sourceCode: string, signal: AbortSignal): P
     body: JSON.stringify({ compiler: 'gcc-head', code: sourceCode, options: '', stdin: '' }),
     signal
   })
-  const result = await response.json() as Partial<CompileResult> & {
+  const result = await response.json().catch(() => ({})) as Partial<CompileResult> & {
     status?: number | string
     error?: string
     compiler_message?: string

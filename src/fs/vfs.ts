@@ -40,33 +40,46 @@ export async function readAll(): Promise<Record<string, string>> {
   return out
 }
 
-const DEFAULT_PROJECT: Record<string, string> = {
-  '/main.cpp': [
-    '#include <iostream>',
-    '',
-    'int main() {',
-    '    std::cout << "Hello from CPP://Web!" << std::endl;',
-    '    std::cout << "Toolchain check: edit me and press Run." << std::endl;',
-    '    return 0;',
-    '}',
-    ''
-  ].join('\n'),
-  '/gui_demo.cpp': [
-    'extern "C" {',
-    '    void gui_clear(int r, int g, int b);',
-    '    void gui_rect(int x, int y, int w, int h, int r, int g, int b);',
-    '    void gui_circle(int x, int y, int radius, int r, int g, int b);',
-    '}',
-    '',
-    'int main() {',
-    '    gui_clear(24, 30, 42);',
-    '    gui_rect(80, 80, 220, 120, 61, 139, 253);',
-    '    gui_circle(400, 240, 55, 224, 175, 104);',
-    '    return 0;',
-    '}',
-    ''
-  ].join('\n')
-}
+const HELLO = [
+  '#include <iostream>',
+  '',
+  'int main() {',
+  '    std::cout << "Hello, World!" << std::endl;',
+  '    return 0;',
+  '}',
+  ''
+].join('\n')
+
+const DEFAULT_PROJECT: Record<string, string> = { '/main.cpp': HELLO }
+
+// Files that earlier builds seeded into every workspace. They are only cleaned up
+// if the user never edited them, so nobody loses work.
+const LEGACY_MAIN = [
+  '#include <iostream>',
+  '',
+  'int main() {',
+  '    std::cout << "Hello from CPP://Web!" << std::endl;',
+  '    std::cout << "Toolchain check: edit me and press Run." << std::endl;',
+  '    return 0;',
+  '}',
+  ''
+].join('\n')
+
+const LEGACY_GUI_DEMO = [
+  'extern "C" {',
+  '    void gui_clear(int r, int g, int b);',
+  '    void gui_rect(int x, int y, int w, int h, int r, int g, int b);',
+  '    void gui_circle(int x, int y, int radius, int r, int g, int b);',
+  '}',
+  '',
+  'int main() {',
+  '    gui_clear(24, 30, 42);',
+  '    gui_rect(80, 80, 220, 120, 61, 139, 253);',
+  '    gui_circle(400, 240, 55, 224, 175, 104);',
+  '    return 0;',
+  '}',
+  ''
+].join('\n')
 
 export async function ensureDefaultProject(): Promise<void> {
   const existing = await listFiles()
@@ -75,19 +88,10 @@ export async function ensureDefaultProject(): Promise<void> {
     return
   }
 
-  const oldStarter = [
-    '#include <iostream>',
-    '',
-    'int main() {',
-    '    std::cout << "Hello, World!" << std::endl;',
-    '    return 0;',
-    '}',
-    ''
-  ].join('\n')
-  if (existing.includes('/main.cpp') && await readFile('/main.cpp') === oldStarter) {
-    await writeFile('/main.cpp', DEFAULT_PROJECT['/main.cpp'])
+  if (existing.includes('/main.cpp') && await readFile('/main.cpp') === LEGACY_MAIN) {
+    await writeFile('/main.cpp', HELLO)
   }
-  if (!existing.includes('/gui_demo.cpp')) {
-    await writeFile('/gui_demo.cpp', DEFAULT_PROJECT['/gui_demo.cpp'])
+  if (existing.includes('/gui_demo.cpp') && await readFile('/gui_demo.cpp') === LEGACY_GUI_DEMO) {
+    await deleteFile('/gui_demo.cpp')
   }
 }
