@@ -164,18 +164,19 @@ export default function Landing({ onOpenEditor, theme, onToggleTheme }: LandingP
           {loadingProfile && !profile && <div className="profile-loading">Loading profile…</div>}
         </aside>
 
-        <footer className="landing-footer">
-          <span className="landing-footer-text">© 2026 NullEntity · CMPG 172 Project</span>
-          <button
-            type="button"
-            className="status-item status-btn landing-toggle"
-            onClick={onToggleTheme}
-            aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}
-          >
-            {theme === 'dark' ? 'Dark' : 'Light'}
-          </button>
-        </footer>
       </main>
+
+      <footer className="landing-footer">
+        <span className="landing-footer-text">© 2026 NullEntity · CMPG 172 Project</span>
+        <button
+          type="button"
+          className="status-item status-btn landing-toggle"
+          onClick={onToggleTheme}
+          aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}
+        >
+          {theme === 'dark' ? 'Dark' : 'Light'}
+        </button>
+      </footer>
     </div>
   )
 }
