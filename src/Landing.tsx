@@ -4,7 +4,11 @@ type LandingProps = {
   onToggleTheme: () => void
 }
 
-const DEV_TEAM: string[] = []
+const DEV_TEAM = [
+  'Reaobaka56',
+  'Reginald8712',
+  'kelebohilemonaheng-code',
+]
 
 export default function Landing({ onOpenEditor, theme, onToggleTheme }: LandingProps) {
   return (
@@ -35,17 +39,12 @@ export default function Landing({ onOpenEditor, theme, onToggleTheme }: LandingP
       </main>
 
       <footer className="landing-footer">
-        <span>
-          {DEV_TEAM.length > 0 ? (
-            <>Built by {DEV_TEAM.map((login, index) => (
-              <span key={login}>
-                {index > 0 && ', '}
-                <a href={`https://github.com/${login}`} target="_blank" rel="noreferrer">{login}</a>
-              </span>
-            ))} · </>
-          ) : 'Built by '}
-          NullEntity · CMPG 172 Project
-        </span>
+        <span>Built by {DEV_TEAM.map((login, index) => (
+          <span key={login}>
+            {index > 0 && ', '}
+            <a href={`https://github.com/${login}`} target="_blank" rel="noreferrer">{login}</a>
+          </span>
+        ))} · NullEntity · CMPG 172 Project</span>
       </footer>
     </div>
   )
