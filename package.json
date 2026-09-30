@@ -4,9 +4,11 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "vite --host 0.0.0.0",
+    "dev:server": "node server/index.js",
     "build": "tsc && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview --host 0.0.0.0",
+    "start": "NODE_ENV=production node server/index.js"
   },
   "dependencies": {
     "@codemirror/commands": "^6.5.0",
@@ -19,6 +21,7 @@
     "@lezer/highlight": "^1.2.5",
     "@xterm/addon-fit": "^0.10.0",
     "@xterm/xterm": "^5.5.0",
+    "express": "^5.2.1",
     "idb-keyval": "^6.2.1",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
