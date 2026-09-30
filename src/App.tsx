@@ -3,6 +3,7 @@ import Landing from './Landing'
 import FileManager from './fs/FileManager'
 import Editor from './editor/Editor'
 import Terminal, { TerminalHandle } from './terminal/Terminal'
+import RunResultPopup, { type RunResult } from './ui/RunResultPopup'
 import { ensureDefaultProject, readAll, writeFile } from './fs/vfs'
 import { compileProject } from './compiler/clang'
 
@@ -25,6 +26,11 @@ export default function App() {
   const [panelHeight, setPanelHeight] = useState(220)
   const [showFiles, setShowFiles] = useState(true)
   const [showTerminal, setShowTerminal] = useState(true)
+  const [stdin, setStdin] = useState('')
+  const [popup, setPopup] = useState<{ fileName: string; source: string; result: RunResult | null } | null>(null)
+  const [showPopup, setShowPopup] = useState(() => {
+    try { return localStorage.getItem('showRunPopup') !== 'false' } catch { return true }
+  })
   const [theme, setTheme] = useState<Theme>(() => {
     const saved = document.documentElement.getAttribute('data-theme') as Theme | null
     return saved === 'light' || saved === 'dark' ? saved : 'dark'
@@ -62,6 +68,33 @@ export default function App() {
 
   const log = useCallback((s: string) => termRef.current?.write(s), [])
 
+  useEffect(() => {
+    try { localStorage.setItem('showRunPopup', String(showPopup)) } catch { /* storage blocked */ }
+  }, [showPopup])
+
+  useEffect(() => {
+    if (showLanding) return
+    let line = ''
+    termRef.current?.onInput((data) => {
+      for (const ch of data) {
+        if (ch === '\r') {
+          log('\r\n')
+          const typed = line
+          line = ''
+          setStdin((value) => value + typed + '\n')
+        } else if (ch === '\x7f' || ch === '\b') {
+          if (line.length > 0) {
+            line = line.slice(0, -1)
+            log('\b \b')
+          }
+        } else if (ch >= ' ') {
+          line += ch
+          log(ch)
+        }
+      }
+    })
+  }, [showLanding, log])
+
   const openFile = useCallback(async (path: string) => {
     setFiles((f) => ({ ...f, [path]: f[path] ?? '' }))
     setOpenTabs((t) => (t.includes(path) ? t : [...t, path]))
@@ -95,28 +128,51 @@ export default function App() {
     termRef.current?.clear()
     const controller = new AbortController()
     abortRef.current = controller
+    const fileName = active.replace(/^\//, '')
+    const source = filesRef.current[active] ?? ''
+    const t0 = performance.now()
+    if (showPopup) setPopup({ fileName, source, result: null })
     try {
       log('\x1b[2mSending source to Wandbox (GCC)…\x1b[0m\r\n')
-      const result = await compileProject(filesRef.current[active] ?? '', controller.signal)
+      const result = await compileProject(source, controller.signal, stdin)
+      const ms = performance.now() - t0
       if (result.compilerOutput) log(result.compilerOutput.replace(/\n/g, '\r\n'))
       if (result.compilerError) log(`\x1b[31m${result.compilerError.replace(/\n/g, '\r\n')}\x1b[0m`)
       if (result.output) log(result.output.replace(/\n/g, '\r\n'))
       if (result.programError) log(`\x1b[31m${result.programError.replace(/\n/g, '\r\n')}\x1b[0m`)
       log(`\x1b[2mProcess exited with code ${result.status}\x1b[0m\r\n`)
+      if (showPopup && !controller.signal.aborted) {
+        setPopup({
+          fileName,
+          source,
+          result: {
+            fileName,
+            exitCode: result.status,
+            ms,
+            compileFailed: result.compilerError.length > 0 && result.output === '',
+            output: result.compilerError || result.output || result.programError
+          }
+        })
+      }
     } catch (e: any) {
-      if (!controller.signal.aborted) log(`\x1b[31mCompile error: ${e?.message ?? e}\x1b[0m\r\n`)
+      if (!controller.signal.aborted) {
+        const message = e?.message ?? String(e)
+        log(`\x1b[31mCompile error: ${message}\x1b[0m\r\n`)
+        if (showPopup) setPopup({ fileName, source, result: { fileName, exitCode: 1, ms: performance.now() - t0, compileFailed: true, output: message } })
+      }
     } finally {
       if (abortRef.current === controller) {
         abortRef.current = null
         setBusy(false)
       }
     }
-  }, [active, busy, log])
+  }, [active, busy, log, stdin, showPopup])
 
   const stop = useCallback(() => {
     abortRef.current?.abort()
     abortRef.current = null
     setBusy(false)
+    setPopup(null)
     log('\x1b[2mStopped\x1b[0m\r\n')
   }, [log])
 
@@ -168,14 +224,18 @@ export default function App() {
         </nav>
         <div className="run-controls">
           <button className="btn primary" onClick={run} disabled={busy || !active} title={`Run (${RUN_HINT})`}>
-            <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><path d="M2 1l7 4-7 4z" fill="currentColor" /></svg>
-            Run
+            {busy ? <span className="spinner small" aria-hidden="true" /> : <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><path d="M2 1l7 4-7 4z" fill="currentColor" /></svg>}
+            {busy ? 'Running…' : 'Run'}
           </button>
           <button className="btn" onClick={stop} disabled={!busy} title="Stop">
             <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><rect x="2" y="2" width="6" height="6" fill="currentColor" /></svg>
             Stop
           </button>
         </div>
+        <label className="popup-toggle" title="Show a result popup after each run">
+          <input type="checkbox" checked={showPopup} onChange={(event) => setShowPopup(event.target.checked)} />
+          Result popup
+        </label>
         <button className="theme-toggle" type="button" onClick={toggleTheme} aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`} title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}>
           {theme === 'dark'
             ? <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="3" fill="none" stroke="currentColor" strokeWidth="1.4" /><path d="M8 1.5v1.4M8 13.1v1.4M1.5 8h1.4M13.1 8h1.4m-10.1-4.6 1 1m5.2 5.2 1 1m0-7.3-1 1m-5.2 5.2-1 1" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" /></svg>
@@ -218,6 +278,11 @@ export default function App() {
               <span>Terminal</span>
               <button className="text-btn" onClick={() => termRef.current?.clear()}>Clear</button>
             </div>
+            <div className="stdin-row">
+              <label htmlFor="program-input">Program input</label>
+              <textarea id="program-input" value={stdin} onChange={(event) => setStdin(event.target.value)}
+                placeholder="Optional stdin; enter each response on a new line" spellCheck={false} rows={2} />
+            </div>
             <div className="term-host"><Terminal ref={termRef} /></div>
           </section>
         </div>
@@ -236,6 +301,16 @@ export default function App() {
           <span className="status-item copyright">© 2026 NullEntity · CMPG 172 Project</span>
         </div>
       </footer>
+
+      {popup && (
+        <RunResultPopup
+          fileName={popup.fileName}
+          source={popup.source}
+          result={popup.result}
+          onClose={() => setPopup(null)}
+          onCancel={stop}
+        />
+      )}
 
       {showWelcome && (
         <div className="welcome-backdrop" onClick={() => setShowWelcome(false)}>

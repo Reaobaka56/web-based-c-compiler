@@ -26,13 +26,19 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     return res.status(413).json({ error: 'Source is too large (maximum 64 KB).' })
   }
 
+  const stdin = body && typeof body === 'object' && 'stdin' in body
+    ? (body as { stdin?: unknown }).stdin
+    : ''
+  if (typeof stdin !== 'string') return res.status(400).json({ error: 'Program input must be text.' })
+  if (stdin.length > 65_536) return res.status(413).json({ error: 'Program input is too large (maximum 64 KB).' })
+
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), 25_000)
   try {
     const upstream = await fetch('https://wandbox.org/api/compile.json', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ compiler: 'gcc-head', code, options: '', stdin: '' }),
+      body: JSON.stringify({ compiler: 'gcc-head', code, options: '', stdin }),
       signal: controller.signal
     })
     if (!upstream.ok) {
