@@ -40,7 +40,86 @@ export async function readAll(): Promise<Record<string, string>> {
   return out
 }
 
-const HELLO = [
+const LINKED_LIST_EXAMPLE = [
+  '#include <iostream>',
+  '#include <string>',
+  '',
+  'using namespace std;',
+  '',
+  'struct nodeType {',
+  '    string info;',
+  '    nodeType* link;',
+  '};',
+  '',
+  'void insertAtHead(nodeType* &head, string value) {',
+  '    nodeType* node1 = new nodeType;',
+  '    node1->info = value;',
+  '    node1->link = head;',
+  '    head = node1;',
+  '}',
+  '',
+  'void deleteNode(nodeType* &head, string value) {',
+  '    nodeType* current = head;',
+  '    nodeType* previous = nullptr;',
+  '',
+  '    while (current != nullptr && current->info != value) {',
+  '        previous = current;',
+  '        current = current->link;',
+  '    }',
+  '',
+  '    if (current == nullptr) {',
+  '        cout << "Value not found.\\n";',
+  '        return;',
+  '    }',
+  '',
+  '    if (previous == nullptr) {',
+  '        head = current->link;',
+  '    } else {',
+  '        previous->link = current->link;',
+  '    }',
+  '',
+  '    delete current;',
+  '    cout << "Node deleted successfully.\\n";',
+  '}',
+  '',
+  'int main() {',
+  '    nodeType* head = nullptr;',
+  '    int choice;',
+  '    string value;',
+  '',
+  '    while (true) {',
+  '        cout << "\\n1. Insert\\n2. Delete\\n3. Display\\n4. Exit\\n";',
+  '        cout << "Enter your choice: ";',
+  '        cin >> choice;',
+  '',
+  '        if (choice == 1) {',
+  '            cout << "Enter value to insert: ";',
+  '            cin >> value;',
+  '            insertAtHead(head, value);',
+  '        } else if (choice == 2) {',
+  '            cout << "Enter value to delete: ";',
+  '            cin >> value;',
+  '            deleteNode(head, value);',
+  '        } else if (choice == 3) {',
+  '            nodeType* temp = head;',
+  '            while (temp != nullptr) {',
+  '                cout << temp->info << endl;',
+  '                temp = temp->link;',
+  '            }',
+  '        } else if (choice == 4) {',
+  '            cout << "Exiting...\\n";',
+  '            break;',
+  '        } else {',
+  '            cout << "Invalid choice\\n";',
+  '        }',
+  '    }',
+  '',
+  '    return 0;',
+  '}',
+  ''
+].join('\n')
+
+const PREVIOUS_DEFAULT = [
   '#include <iostream>',
   '',
   'int main() {',
@@ -50,7 +129,7 @@ const HELLO = [
   ''
 ].join('\n')
 
-const DEFAULT_PROJECT: Record<string, string> = { '/main.cpp': HELLO }
+const DEFAULT_PROJECT: Record<string, string> = { '/main.cpp': LINKED_LIST_EXAMPLE }
 
 // Files that earlier builds seeded into every workspace. They are only cleaned up
 // if the user never edited them, so nobody loses work.
@@ -88,8 +167,11 @@ export async function ensureDefaultProject(): Promise<void> {
     return
   }
 
-  if (existing.includes('/main.cpp') && await readFile('/main.cpp') === LEGACY_MAIN) {
-    await writeFile('/main.cpp', HELLO)
+  if (existing.includes('/main.cpp')) {
+    const main = await readFile('/main.cpp')
+    if (main === PREVIOUS_DEFAULT || main === LEGACY_MAIN) {
+      await writeFile('/main.cpp', LINKED_LIST_EXAMPLE)
+    }
   }
   if (existing.includes('/gui_demo.cpp') && await readFile('/gui_demo.cpp') === LEGACY_GUI_DEMO) {
     await deleteFile('/gui_demo.cpp')
