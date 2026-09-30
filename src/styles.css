@@ -265,6 +265,28 @@ ul { list-style: none; }
   min-height: 0;
   background: var(--editor-bg);
 }
+.program-input {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 12px;
+  border-bottom: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 12px;
+}
+.program-input label { flex: 0 0 auto; }
+.program-input textarea {
+  width: 100%;
+  min-width: 0;
+  resize: vertical;
+  padding: 4px 7px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--chrome-bg);
+  color: var(--fg);
+  font: 12px/1.4 var(--font-mono);
+}
+.program-input textarea::placeholder { color: var(--muted); }
 .term-host { flex: 1; min-height: 0; padding: 0 12px 6px; }
 .xterm .xterm-viewport { background-color: transparent !important; }
 

@@ -17,10 +17,11 @@ export default function App() {
   const [files, setFiles] = useState<Record<string, string>>({})
   const [openTabs, setOpenTabs] = useState<string[]>([])
   const [active, setActive] = useState<string | null>(null)
-  const [showLanding, setShowLanding] = useState(true)
-  const [showWelcome, setShowWelcome] = useState(false)
+  const [showLanding, setShowLanding] = useState(false)
+  const [showWelcome, setShowWelcome] = useState(true)
   const [refreshKey, setRefreshKey] = useState(0)
   const [busy, setBusy] = useState(false)
+  const [programInput, setProgramInput] = useState('')
   const [cursor, setCursor] = useState({ line: 1, col: 1 })
   const [panelHeight, setPanelHeight] = useState(220)
   const [showFiles, setShowFiles] = useState(true)
@@ -97,7 +98,7 @@ export default function App() {
     abortRef.current = controller
     try {
       log('\x1b[2mSending source to Wandbox (GCC)…\x1b[0m\r\n')
-      const result = await compileProject(filesRef.current[active] ?? '', controller.signal)
+      const result = await compileProject(filesRef.current[active] ?? '', controller.signal, programInput)
       if (result.compilerOutput) log(result.compilerOutput.replace(/\n/g, '\r\n'))
       if (result.compilerError) log(`\x1b[31m${result.compilerError.replace(/\n/g, '\r\n')}\x1b[0m`)
       if (result.output) log(result.output.replace(/\n/g, '\r\n'))
@@ -111,7 +112,7 @@ export default function App() {
         setBusy(false)
       }
     }
-  }, [active, busy, log])
+  }, [active, busy, log, programInput])
 
   const stop = useCallback(() => {
     abortRef.current?.abort()
@@ -217,6 +218,16 @@ export default function App() {
             <div className="pane-head">
               <span>Terminal</span>
               <button className="text-btn" onClick={() => termRef.current?.clear()}>Clear</button>
+            </div>
+            <div className="program-input">
+              <label htmlFor="program-input">Program input</label>
+              <textarea
+                id="program-input"
+                rows={2}
+                value={programInput}
+                onChange={(event) => setProgramInput(event.target.value)}
+                placeholder="Optional stdin; enter each response on a new line"
+              />
             </div>
             <div className="term-host"><Terminal ref={termRef} /></div>
           </section>
