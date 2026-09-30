@@ -7,70 +7,84 @@ export interface TerminalHandle {
   write: (data: string) => void
   clear: () => void
   onInput: (cb: (data: string) => void) => void
-}
-
-function cssVar(name: string) {
-  return getComputedStyle(document.documentElement).getPropertyValue(name).trim()
-}
-
-function currentTheme() {
-  return {
-    background: cssVar('--editor-bg'),
-    foreground: cssVar('--fg'),
-    cursor: cssVar('--fg'),
-    selectionBackground: cssVar('--selection')
-  }
+  focus: () => void
 }
 
 const Terminal = forwardRef<TerminalHandle>(function Terminal(_, ref) {
   const hostRef = useRef<HTMLDivElement>(null)
   const termRef = useRef<XTerm | null>(null)
-  const inputCb = useRef<((data: string) => void) | null>(null)
+  const fitRef = useRef<FitAddon | null>(null)
+  const inputCb = useRef<((d: string) => void) | null>(null)
+
+  const focusTerminal = () => {
+    const terminal = termRef.current
+    if (!terminal) return
+    terminal.focus()
+    if (hostRef.current) hostRef.current.focus()
+  }
 
   useEffect(() => {
-    const host = hostRef.current
-    if (!host) return
-
     const term = new XTerm({
       cursorBlink: true,
       convertEol: true,
-      fontFamily: cssVar('--font-mono'),
+      fontFamily: 'SFMono-Regular, Cascadia Code, Menlo, monospace',
       fontSize: 13,
-      theme: currentTheme()
+      theme: {
+        background: '#111722',
+        foreground: '#d8e1f0',
+        cursor: '#81a9ff',
+        selectionBackground: '#7597d844'
+      }
     })
     const fit = new FitAddon()
-
     term.loadAddon(fit)
-    term.open(host)
+    term.open(hostRef.current!)
     fit.fit()
-    term.writeln('\x1b[36mCppPad terminal\x1b[0m — output appears here. Input is forwarded to the running program.')
-    term.onData((d) => inputCb.current?.(d))
+    term.writeln('\x1b[36mCppPad terminal\x1b[0m — output appears here. Type input and press Enter; it is sent as stdin on the next Run.')
 
-    const resizeObserver = new ResizeObserver(() => fit.fit())
-    resizeObserver.observe(host)
-
-    const themeObserver = new MutationObserver(() => {
-      term.options.theme = currentTheme()
+    let line = ''
+    term.onData((d) => {
+      for (const ch of d) {
+        if (ch === '\r') {
+          term.write('\r\n')
+          inputCb.current?.(line + '\n')
+          line = ''
+        } else if (ch === '\x7f' || ch === '\b') {
+          if (line.length > 0) {
+            line = line.slice(0, -1)
+            term.write('\b \b')
+          }
+        } else if (ch >= ' ' && ch !== '\x7f') {
+          line += ch
+          term.write(ch)
+        }
+      }
     })
-    themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] })
+    term.focus()
 
+    const onResize = () => fit.fit()
+    window.addEventListener('resize', onResize)
     termRef.current = term
-
-    return () => {
-      resizeObserver.disconnect()
-      themeObserver.disconnect()
-      term.dispose()
-      termRef.current = null
-    }
+    fitRef.current = fit
+    return () => { window.removeEventListener('resize', onResize); term.dispose() }
   }, [])
 
   useImperativeHandle(ref, () => ({
     write: (d) => termRef.current?.write(d),
     clear: () => termRef.current?.clear(),
-    onInput: (cb) => { inputCb.current = cb }
+    onInput: (cb) => { inputCb.current = cb },
+    focus: focusTerminal
   }))
 
-  return <div ref={hostRef} style={{ height: '100%', width: '100%' }} />
+  return (
+    <div
+      ref={hostRef}
+      tabIndex={0}
+      onClick={focusTerminal}
+      onFocus={focusTerminal}
+      style={{ height: '100%', width: '100%', cursor: 'text' }}
+    />
+  )
 })
 
 export default Terminal

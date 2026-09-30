@@ -1,4 +1,16 @@
 {
+  "redirects": [
+    {
+      "source": "/:path((?!api/|assets/|demo/|toolchain/)[^.]*)",
+      "destination": "/",
+      "permanent": false
+    },
+    {
+      "source": "https://:project.vercel.app/:path*",
+      "destination": "https://<MY_DOMAIN>/:path*",
+      "permanent": false
+    }
+  ],
   "headers": [
     {
       "source": "/(.*)",
