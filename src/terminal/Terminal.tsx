@@ -7,6 +7,7 @@ export interface TerminalHandle {
   write: (data: string) => void
   clear: () => void
   onInput: (cb: (data: string) => void) => void
+  focus: () => void
 }
 
 function cssVar(name: string) {
@@ -26,6 +27,8 @@ const Terminal = forwardRef<TerminalHandle>(function Terminal(_, ref) {
   const hostRef = useRef<HTMLDivElement>(null)
   const termRef = useRef<XTerm | null>(null)
   const inputCb = useRef<((data: string) => void) | null>(null)
+
+  const focusTerminal = () => termRef.current?.focus()
 
   useEffect(() => {
     const host = hostRef.current
@@ -67,10 +70,11 @@ const Terminal = forwardRef<TerminalHandle>(function Terminal(_, ref) {
   useImperativeHandle(ref, () => ({
     write: (d) => termRef.current?.write(d),
     clear: () => termRef.current?.clear(),
-    onInput: (cb) => { inputCb.current = cb }
+    onInput: (cb) => { inputCb.current = cb },
+    focus: focusTerminal
   }))
 
-  return <div ref={hostRef} style={{ height: '100%', width: '100%' }} />
+  return <div ref={hostRef} onClick={focusTerminal} style={{ height: '100%', width: '100%', cursor: 'text' }} />
 })
 
 export default Terminal

@@ -484,12 +484,4 @@ ul { list-style: none; }
 @keyframes spin { to { transform: rotate(360deg); } }
 @keyframes slide { 0% { transform: translateX(-100%); } 100% { transform: translateX(290%); } }
 
-.run-popup-tabs { display: flex; border-bottom: 1px solid var(--border); }
-.run-popup-tabs button { height: 30px; padding: 0 14px; color: var(--muted); font-size: 12px; border-bottom: 2px solid transparent; }
-.run-popup-tabs button:hover { color: var(--fg); }
-.run-popup-tabs button.active { color: var(--fg); border-bottom-color: var(--accent); }
-.run-popup-code { max-height: 40vh; overflow: auto; margin: 0; padding: 8px 0; border: 1px solid var(--border); border-radius: var(--radius); background: var(--editor-bg); color: var(--fg); font: 12px/1.6 var(--font-mono); }
-.code-line { display: block; padding-right: 12px; white-space: pre; }
-.code-line.error { background: color-mix(in srgb, var(--danger) 16%, transparent); box-shadow: inset 2px 0 var(--danger); }
-.code-no { display: inline-block; width: 40px; padding-right: 12px; text-align: right; color: var(--line-number); user-select: none; }
 @media (prefers-reduced-motion: reduce) { .spinner, .run-popup-bar span { animation-duration: 2.4s; } }

@@ -27,7 +27,7 @@ export default function App() {
   const [showFiles, setShowFiles] = useState(true)
   const [showTerminal, setShowTerminal] = useState(true)
   const [stdin, setStdin] = useState('')
-  const [popup, setPopup] = useState<{ fileName: string; source: string; result: RunResult | null } | null>(null)
+  const [popup, setPopup] = useState<{ fileName: string; result: RunResult | null } | null>(null)
   const [showPopup, setShowPopup] = useState(() => {
     try { return localStorage.getItem('showRunPopup') !== 'false' } catch { return true }
   })
@@ -131,7 +131,7 @@ export default function App() {
     const fileName = active.replace(/^\//, '')
     const source = filesRef.current[active] ?? ''
     const t0 = performance.now()
-    if (showPopup) setPopup({ fileName, source, result: null })
+    if (showPopup) setPopup({ fileName, result: null })
     try {
       log('\x1b[2mSending source to Wandbox (GCC)…\x1b[0m\r\n')
       const result = await compileProject(source, controller.signal, stdin)
@@ -144,7 +144,6 @@ export default function App() {
       if (showPopup && !controller.signal.aborted) {
         setPopup({
           fileName,
-          source,
           result: {
             fileName,
             exitCode: result.status,
@@ -158,7 +157,7 @@ export default function App() {
       if (!controller.signal.aborted) {
         const message = e?.message ?? String(e)
         log(`\x1b[31mCompile error: ${message}\x1b[0m\r\n`)
-        if (showPopup) setPopup({ fileName, source, result: { fileName, exitCode: 1, ms: performance.now() - t0, compileFailed: true, output: message } })
+        if (showPopup) setPopup({ fileName, result: { fileName, exitCode: 1, ms: performance.now() - t0, compileFailed: true, output: message } })
       }
     } finally {
       if (abortRef.current === controller) {
@@ -174,9 +173,15 @@ export default function App() {
     setBusy(false)
     setPopup(null)
     log('\x1b[2mStopped\x1b[0m\r\n')
+    requestAnimationFrame(() => termRef.current?.focus())
   }, [log])
 
   const toggleTheme = () => setTheme((theme) => (theme === 'dark' ? 'light' : 'dark'))
+
+  const closePopup = useCallback(() => {
+    setPopup(null)
+    requestAnimationFrame(() => termRef.current?.focus())
+  }, [])
 
   const openEditor = useCallback(() => {
     const target = files['/main.cpp'] !== undefined ? '/main.cpp' : Object.keys(files).sort()[0] ?? null
@@ -305,9 +310,8 @@ export default function App() {
       {popup && (
         <RunResultPopup
           fileName={popup.fileName}
-          source={popup.source}
           result={popup.result}
-          onClose={() => setPopup(null)}
+          onClose={closePopup}
           onCancel={stop}
         />
       )}

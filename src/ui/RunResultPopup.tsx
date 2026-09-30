@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 export interface RunResult {
   fileName: string
@@ -10,27 +10,15 @@ export interface RunResult {
 
 interface Props {
   fileName: string
-  source: string
   result: RunResult | null
   onClose: () => void
   onCancel: () => void
 }
 
-function errorLines(text: string): Set<number> {
-  const lines = new Set<number>()
-  for (const match of text.matchAll(/prog\.[a-z+]+:(\d+):\d+:\s*(?:fatal )?error/gi)) {
-    lines.add(Number(match[1]))
-  }
-  return lines
-}
-
-export default function RunResultPopup({ fileName, source, result, onClose, onCancel }: Props) {
+export default function RunResultPopup({ fileName, result, onClose, onCancel }: Props) {
   const ref = useRef<HTMLElement>(null)
   const compiling = result === null
   const [elapsed, setElapsed] = useState(0)
-  const [tab, setTab] = useState<'output' | 'code'>('output')
-  const bad = useMemo(() => (result ? errorLines(result.output) : new Set<number>()), [result])
-  const codeLines = useMemo(() => source.split('\n'), [source])
 
   useEffect(() => { ref.current?.focus() }, [])
 
@@ -40,10 +28,6 @@ export default function RunResultPopup({ fileName, source, result, onClose, onCa
     const id = setInterval(() => setElapsed(performance.now() - startedAt), 100)
     return () => clearInterval(id)
   }, [compiling])
-
-  useEffect(() => {
-    if (result) setTab(result.compileFailed && bad.size > 0 ? 'code' : 'output')
-  }, [result, bad])
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -60,16 +44,6 @@ export default function RunResultPopup({ fileName, source, result, onClose, onCa
 
   const ok = result ? result.exitCode === 0 && !result.compileFailed : false
   const dismiss = compiling ? onCancel : onClose
-
-  const codeView = (
-    <pre className="run-popup-code" aria-label="Source code preview">
-      {codeLines.map((text, index) => (
-        <span key={index} className={'code-line' + (bad.has(index + 1) ? ' error' : '')}>
-          <span className="code-no">{index + 1}</span>{text || ' '}{'\n'}
-        </span>
-      ))}
-    </pre>
-  )
 
   return (
     <div className="run-backdrop" onClick={(event) => { if (event.target === event.currentTarget) dismiss() }}>
@@ -91,23 +65,12 @@ export default function RunResultPopup({ fileName, source, result, onClose, onCa
               </div>
               <div className="run-popup-bar" aria-hidden="true"><span /></div>
             </div>
-            {codeView}
           </div>
         ) : (
           <>
-            <div className="run-popup-tabs" role="tablist">
-              <button role="tab" aria-selected={tab === 'output'} className={tab === 'output' ? 'active' : ''} onClick={() => setTab('output')}>Output</button>
-              <button role="tab" aria-selected={tab === 'code'} className={tab === 'code' ? 'active' : ''} onClick={() => setTab('code')}>
-                Code{bad.size > 0 ? ` (${bad.size} error${bad.size > 1 ? 's' : ''})` : ''}
-              </button>
-            </div>
             <div className="run-popup-body">
-              {tab === 'output' ? (
-                <>
-                  {result.compileFailed && <div className="run-popup-fail">Build failed</div>}
-                  <pre className="run-popup-output">{result.output}</pre>
-                </>
-              ) : codeView}
+              {result.compileFailed && <div className="run-popup-fail">Build failed</div>}
+              <pre className="run-popup-output">{result.output}</pre>
               <div className={'run-popup-status ' + (ok ? 'ok' : 'bad')}>
                 Process returned {result.exitCode} (0x{result.exitCode.toString(16).toUpperCase()})   execution time : {(result.ms / 1000).toFixed(3)} s
               </div>
