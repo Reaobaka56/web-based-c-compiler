@@ -131,6 +131,10 @@ const PREVIOUS_DEFAULT = [
 
 const DEFAULT_PROJECT: Record<string, string> = { '/main.cpp': LINKED_LIST_EXAMPLE }
 
+function normalizeSource(source: string): string {
+  return source.replace(/\r\n?/g, '\n').split('\n').map((line) => line.trim()).join('\n').trim()
+}
+
 // Files that earlier builds seeded into every workspace. They are only cleaned up
 // if the user never edited them, so nobody loses work.
 const LEGACY_MAIN = [
@@ -169,7 +173,8 @@ export async function ensureDefaultProject(): Promise<void> {
 
   if (existing.includes('/main.cpp')) {
     const main = await readFile('/main.cpp')
-    if (main === PREVIOUS_DEFAULT || main === LEGACY_MAIN) {
+    const normalizedMain = normalizeSource(main)
+    if (normalizedMain === normalizeSource(PREVIOUS_DEFAULT) || normalizedMain === normalizeSource(LEGACY_MAIN)) {
       await writeFile('/main.cpp', LINKED_LIST_EXAMPLE)
     }
   }
