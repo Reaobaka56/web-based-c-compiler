@@ -20,7 +20,6 @@ const Terminal = forwardRef<TerminalHandle>(function Terminal(_, ref) {
     const terminal = termRef.current
     if (!terminal) return
     terminal.focus()
-    if (hostRef.current) hostRef.current.focus()
   }
 
   useEffect(() => {
@@ -79,9 +78,7 @@ const Terminal = forwardRef<TerminalHandle>(function Terminal(_, ref) {
   return (
     <div
       ref={hostRef}
-      tabIndex={0}
       onClick={focusTerminal}
-      onFocus={focusTerminal}
       style={{ height: '100%', width: '100%', cursor: 'text' }}
     />
   )

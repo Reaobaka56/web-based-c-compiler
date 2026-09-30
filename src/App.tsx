@@ -6,6 +6,9 @@ import CanvasWindow, { GuiMessage } from './gui/CanvasWindow'
 import { ensureDefaultProject, writeFile, readAll } from './fs/vfs'
 import { compileProject, toolchainStatus } from './compiler/clang'
 import { WorkerHost } from './runner/WorkerHost'
+import RunResultPopup from './ui/RunResultPopup'
+
+type RunResult = { fileName: string; exitCode: number; ms: number; compileFailed: boolean; output: string }
 
 export default function App() {
   const [files, setFiles] = useState<Record<string, string>>({})
@@ -17,6 +20,14 @@ export default function App() {
   const [guiOpen, setGuiOpen] = useState(false)
   const [guiOp, setGuiOp] = useState<GuiMessage | null>(null)
   const [programInput, setProgramInput] = useState('')
+  const [popup, setPopup] = useState<RunResult | null>(null)
+  const [showRunPopup, setShowRunPopup] = useState(() => {
+    try {
+      return window.localStorage.getItem('showRunPopup') !== 'false'
+    } catch {
+      return true
+    }
+  })
   const termRef = useRef<TerminalHandle | null>(null)
   const hostRef = useRef<WorkerHost | null>(null)
   const filesRef = useRef(files)
@@ -39,6 +50,12 @@ export default function App() {
   }, [])
 
   const log = useCallback((s: string) => termRef.current?.write(s), [])
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem('showRunPopup', String(showRunPopup))
+    } catch {}
+  }, [showRunPopup])
 
   const openFile = useCallback(async (path: string) => {
     setFiles((f) => ({ ...f, [path]: f[path] ?? '' }))
@@ -71,25 +88,46 @@ export default function App() {
     if (!active) return
     setBusy(true)
     termRef.current?.clear()
+    let t0 = performance.now()
     try {
       const source = filesRef.current[active] ?? ''
       await writeFile(active, source)
+      t0 = performance.now()
       const compiled = await compileProject(source, new AbortController().signal, programInput)
+      const ms = performance.now() - t0
+      const result: RunResult = {
+        fileName: active.replace(/^\//, ''),
+        exitCode: compiled.status,
+        ms,
+        compileFailed: compiled.compilerError.length > 0 && compiled.output === '',
+        output: compiled.compilerError || compiled.output || compiled.programError
+      }
       hostRef.current ??= new WorkerHost()
-      setGuiOpen(true)
       hostRef.current.run(compiled, {
         onStdout: (d) => termRef.current?.write(d),
         onGui: (m) => setGuiOp(m),
         onExit: (code) => {
           log(`\x1b[32m── program exited (code ${code}) ──\x1b[0m\n`)
           setBusy(false)
+          if (showRunPopup) setPopup(result)
         }
       })
+      setProgramInput('')
     } catch (e: any) {
-      log(`\x1b[31mcompile error: ${e?.message ?? e}\x1b[0m\n`)
+      const message = e?.message ?? String(e)
+      log(`\x1b[31mcompile error: ${message}\x1b[0m\n`)
       setBusy(false)
+      if (showRunPopup) {
+        setPopup({
+          fileName: active.replace(/^\//, ''),
+          exitCode: 1,
+          ms: performance.now() - t0,
+          compileFailed: true,
+          output: message
+        })
+      }
     }
-  }, [active, log])
+  }, [active, log, programInput, showRunPopup])
 
   const stop = useCallback(() => {
     hostRef.current?.kill()
@@ -131,6 +169,10 @@ export default function App() {
           <button className="btn" onClick={stop} disabled={!busy}><span className="btn-icon">■</span> Stop</button>
           <button className="btn btn-quiet" onClick={guiDemo}><span className="btn-icon">◈</span> Canvas</button>
         </div>
+        <label className="popup-toggle">
+          <input type="checkbox" checked={showRunPopup} onChange={(event) => setShowRunPopup(event.target.checked)} />
+          Show result popup
+        </label>
         <span className={'status ' + (tcStatus === 'ready' ? 'ok' : tcStatus === 'demo' ? 'err' : '')}>
           <span className="status-dot" />
           {tcStatus === 'checking' ? 'toolchain: checking…'
@@ -173,6 +215,14 @@ export default function App() {
         <div className="term-host"><Terminal ref={termRef} /></div>
       </div>
       {guiOpen && <CanvasWindow title="Program Output — 640×480" onClose={() => setGuiOpen(false)} op={guiOp} />}
+      <RunResultPopup
+        open={!!popup}
+        result={popup}
+        onClose={() => {
+          setPopup(null)
+          requestAnimationFrame(() => termRef.current?.focus())
+        }}
+      />
     </div>
   )
 }

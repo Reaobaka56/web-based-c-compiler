@@ -1,4 +1,5 @@
 import type { GuiMessage } from '../gui/CanvasWindow'
+import type { CompileResult } from '../compiler/clang'
 
 export interface HostCallbacks {
   onStdout?: (data: string) => void
@@ -12,15 +13,20 @@ export class WorkerHost {
   private gui?: (message: GuiMessage) => void
   private exit?: (code: number) => void
 
-  run(_program: unknown, callbacks: HostCallbacks = {}) {
+  run(program: CompileResult, callbacks: HostCallbacks = {}) {
     this.active = true
     this.stdout = callbacks.onStdout
     this.gui = callbacks.onGui
     this.exit = callbacks.onExit
 
-    this.stdout?.('\x1b[36mCPP://Web runtime\x1b[0m — process running. Type in the terminal to send input.\n')
-    this.gui?.({ op: 'clear', r: 15, g: 17, b: 23 })
-    this.exit?.(0)
+    const nl = (text: string) => (text.endsWith('\n') ? text : text + '\n')
+    if (program.compilerOutput) this.stdout?.(nl(program.compilerOutput))
+    if (program.compilerError) this.stdout?.('\x1b[31m' + nl(program.compilerError) + '\x1b[0m')
+    if (program.output) this.stdout?.(nl(program.output))
+    if (program.programError) this.stdout?.('\x1b[33m' + nl(program.programError) + '\x1b[0m')
+
+    this.active = false
+    this.exit?.(program.status)
   }
 
   sendStdin(data: string) {
