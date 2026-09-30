@@ -40,105 +40,84 @@ export async function readAll(): Promise<Record<string, string>> {
   return out
 }
 
-const LINKED_LIST_EXAMPLE = String.raw`#include <iostream>
-#include <string>
-#include <limits>
-
-using namespace std;
-
-struct nodeType {
-  string info;
-  nodeType* link;
-};
-
-void insertAtHead(nodeType* &head, const string& value) {
-  nodeType* node1 = new nodeType;
-  node1->info = value;
-  node1->link = head;
-  head = node1;
-}
-
-void deleteNode(nodeType* &head, const string& value) {
-  nodeType* current = head;
-  nodeType* previous = nullptr;
-
-  while (current != nullptr && current->info != value) {
-    previous = current;
-    current = current->link;
-  }
-
-  if (current == nullptr) {
-    cout << "Value not found.\n";
-    return;
-  }
-
-  if (previous == nullptr) {
-    head = current->link;
-  } else {
-    previous->link = current->link;
-  }
-
-  delete current;
-  cout << "Node deleted successfully.\n";
-}
-
-void displayList(const nodeType* head) {
-  if (head == nullptr) {
-    cout << "List is empty.\n";
-    return;
-  }
-  for (const nodeType* temp = head; temp != nullptr; temp = temp->link) {
-    cout << temp->info << endl;
-  }
-}
-
-void clearList(nodeType* &head) {
-  while (head != nullptr) {
-    nodeType* temp = head;
-    head = head->link;
-    delete temp;
-  }
-}
-
-int main() {
-  nodeType* head = nullptr;
-  int choice;
-  string value;
-
-  while (true) {
-    cout << "\n1. Insert\n2. Delete\n3. Display\n4. Exit\n";
-    cout << "Enter your choice: ";
-
-    if (!(cin >> choice)) {
-      if (cin.eof()) break;
-      cin.clear();
-            cin.ignore(numeric_limits<streamsize>::max(), '\n');
-            cout << "Invalid choice\n";
-      continue;
-    }
-    cin.ignore(numeric_limits<streamsize>::max(), '\n');
-
-    if (choice == 1) {
-      cout << "Enter value to insert: ";
-      getline(cin, value);
-      insertAtHead(head, value);
-    } else if (choice == 2) {
-      cout << "Enter value to delete: ";
-      getline(cin, value);
-      deleteNode(head, value);
-    } else if (choice == 3) {
-      displayList(head);
-    } else if (choice == 4) {
-            cout << "Exiting...\n";
-      break;
-    } else {
-            cout << "Invalid choice\n";
-    }
-  }
-
-  clearList(head);
-  return 0;
-}`
+const LINKED_LIST_EXAMPLE = [
+  '#include <iostream>',
+  '#include <string>',
+  '',
+  'using namespace std;',
+  '',
+  'struct nodeType {',
+  '    string info;',
+  '    nodeType* link;',
+  '};',
+  '',
+  'void insertAtHead(nodeType* &head, string value) {',
+  '    nodeType* node1 = new nodeType;',
+  '    node1->info = value;',
+  '    node1->link = head;',
+  '    head = node1;',
+  '}',
+  '',
+  'void deleteNode(nodeType* &head, string value) {',
+  '    nodeType* current = head;',
+  '    nodeType* previous = nullptr;',
+  '',
+  '    while (current != nullptr && current->info != value) {',
+  '        previous = current;',
+  '        current = current->link;',
+  '    }',
+  '',
+  '    if (current == nullptr) {',
+  '        cout << "Value not found.\\n";',
+  '        return;',
+  '    }',
+  '',
+  '    if (previous == nullptr) {',
+  '        head = current->link;',
+  '    } else {',
+  '        previous->link = current->link;',
+  '    }',
+  '',
+  '    delete current;',
+  '    cout << "Node deleted successfully.\\n";',
+  '}',
+  '',
+  'int main() {',
+  '    nodeType* head = nullptr;',
+  '    int choice;',
+  '    string value;',
+  '',
+  '    while (true) {',
+  '        cout << "\\n1. Insert\\n2. Delete\\n3. Display\\n4. Exit\\n";',
+  '        cout << "Enter your choice: ";',
+  '        cin >> choice;',
+  '',
+  '        if (choice == 1) {',
+  '            cout << "Enter value to insert: ";',
+  '            cin >> value;',
+  '            insertAtHead(head, value);',
+  '        } else if (choice == 2) {',
+  '            cout << "Enter value to delete: ";',
+  '            cin >> value;',
+  '            deleteNode(head, value);',
+  '        } else if (choice == 3) {',
+  '            nodeType* temp = head;',
+  '            while (temp != nullptr) {',
+  '                cout << temp->info << endl;',
+  '                temp = temp->link;',
+  '            }',
+  '        } else if (choice == 4) {',
+  '            cout << "Exiting...\\n";',
+  '            break;',
+  '        } else {',
+  '            cout << "Invalid choice\\n";',
+  '        }',
+  '    }',
+  '',
+  '    return 0;',
+  '}',
+  ''
+].join('\n')
 
 const PREVIOUS_DEFAULT = [
   '#include <iostream>',
@@ -150,87 +129,7 @@ const PREVIOUS_DEFAULT = [
   ''
 ].join('\n')
 
-const PREVIOUS_LINKED_LIST_EXAMPLE = String.raw`#include <iostream>
-#include <string>
-
-using namespace std;
-
-struct nodeType {
-  string info;
-  nodeType* link;
-};
-
-void insertAtHead(nodeType* &head, string value) {
-  nodeType* node1 = new nodeType;
-  node1->info = value;
-  node1->link = head;
-  head = node1;
-}
-
-void deleteNode(nodeType* &head, string value) {
-  nodeType* current = head;
-  nodeType* previous = nullptr;
-
-  while (current != nullptr && current->info != value) {
-    previous = current;
-    current = current->link;
-  }
-
-  if (current == nullptr) {
-    cout << "Value not found.\n";
-    return;
-  }
-
-  if (previous == nullptr) {
-    head = current->link;
-  } else {
-    previous->link = current->link;
-  }
-
-  delete current;
-  cout << "Node deleted successfully.\n";
-}
-
-int main() {
-  nodeType* head = nullptr;
-  int choice;
-  string value;
-
-  while (true) {
-    cout << "\n1. Insert\n2. Delete\n3. Display\n4. Exit\n";
-    cout << "Enter your choice: ";
-    cin >> choice;
-
-    if (choice == 1) {
-      cout << "Enter value to insert: ";
-      cin >> value;
-      insertAtHead(head, value);
-    } else if (choice == 2) {
-      cout << "Enter value to delete: ";
-      cin >> value;
-      deleteNode(head, value);
-    } else if (choice == 3) {
-      nodeType* temp = head;
-      while (temp != nullptr) {
-        cout << temp->info << endl;
-        temp = temp->link;
-      }
-    } else if (choice == 4) {
-            cout << "Exiting...\n";
-      break;
-    } else {
-            cout << "Invalid choice\n";
-    }
-  }
-
-  return 0;
-}`
-
 const DEFAULT_PROJECT: Record<string, string> = { '/main.cpp': LINKED_LIST_EXAMPLE }
-
-function normalizeSource(source: string): string {
-  return source.replace(/\r\n?/g, '\n').split('\n').map((line) => line.trim()).join('\n').trim()
-}
 
 // Files that earlier builds seeded into every workspace. They are only cleaned up
 // if the user never edited them, so nobody loses work.
@@ -270,12 +169,7 @@ export async function ensureDefaultProject(): Promise<void> {
 
   if (existing.includes('/main.cpp')) {
     const main = await readFile('/main.cpp')
-    const normalizedMain = normalizeSource(main)
-    if (
-      normalizedMain === normalizeSource(PREVIOUS_DEFAULT) ||
-      normalizedMain === normalizeSource(PREVIOUS_LINKED_LIST_EXAMPLE) ||
-      normalizedMain === normalizeSource(LEGACY_MAIN)
-    ) {
+    if (main === PREVIOUS_DEFAULT || main === LEGACY_MAIN) {
       await writeFile('/main.cpp', LINKED_LIST_EXAMPLE)
     }
   }
