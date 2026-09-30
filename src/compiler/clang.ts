@@ -6,11 +6,11 @@ export interface CompileResult {
   programError: string
 }
 
-export async function compileProject(sourceCode: string, signal: AbortSignal): Promise<CompileResult> {
+export async function compileProject(sourceCode: string, signal: AbortSignal, stdin = ''): Promise<CompileResult> {
   const response = await fetch('/api/compile', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ compiler: 'gcc-head', code: sourceCode, options: '', stdin: '' }),
+    body: JSON.stringify({ compiler: 'gcc-head', code: sourceCode, options: '', stdin }),
     signal
   })
   const result = await response.json().catch(() => ({})) as Partial<CompileResult> & {
