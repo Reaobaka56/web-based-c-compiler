@@ -18,6 +18,7 @@ export default function App() {
   const [openTabs, setOpenTabs] = useState<string[]>([])
   const [active, setActive] = useState<string | null>(null)
   const [showLanding, setShowLanding] = useState(true)
+  const [showWelcome, setShowWelcome] = useState(false)
   const [refreshKey, setRefreshKey] = useState(0)
   const [busy, setBusy] = useState(false)
   const [cursor, setCursor] = useState({ line: 1, col: 1 })
@@ -37,6 +38,15 @@ export default function App() {
     document.documentElement.setAttribute('data-theme', theme)
     try { localStorage.setItem('theme', theme) } catch { /* storage blocked */ }
   }, [theme])
+
+  useEffect(() => {
+    if (!showWelcome) return
+    const dismissOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setShowWelcome(false)
+    }
+    window.addEventListener('keydown', dismissOnEscape)
+    return () => window.removeEventListener('keydown', dismissOnEscape)
+  }, [showWelcome])
 
   useEffect(() => {
     ;(async () => {
@@ -118,6 +128,7 @@ export default function App() {
     setOpenTabs((tabs) => (tabs.includes(target) ? tabs : [target]))
     setActive(target)
     setShowLanding(false)
+    setShowWelcome(true)
   }, [files])
 
   const startResize = (e: React.PointerEvent<HTMLDivElement>) => {
@@ -225,6 +236,40 @@ export default function App() {
           <span className="status-item copyright">© 2026 NullEntity · CMPG 172 Project</span>
         </div>
       </footer>
+
+      {showWelcome && (
+        <div className="welcome-backdrop" onClick={() => setShowWelcome(false)}>
+          <section
+            className="welcome-card"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="welcome-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <h1 id="welcome-title">Welcome to cppPad</h1>
+            <p className="welcome-intro">A code editor made by NullEntity for CMPG172.</p>
+            <p className="welcome-description">
+              This editor was built using TypeScript. It's a browser-based C++ editor with an IndexedDB-backed workspace and online compilation through Wandbox.
+            </p>
+            <p className="welcome-description">
+              The purpose of this compiler is to demonstrate linked-list insertion and deletion.
+            </p>
+            <div className="welcome-actions">
+              <a
+                className="btn welcome-source"
+                href="https://github.com/Reaobaka56/web-based-c-compiler"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                View Compiler Source Code
+              </a>
+              <button className="btn primary" type="button" autoFocus onClick={() => setShowWelcome(false)}>
+                Get Started
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
     </div>
   )
 }
