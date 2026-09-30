@@ -40,8 +40,26 @@ const Terminal = forwardRef<TerminalHandle>(function Terminal(_, ref) {
     term.loadAddon(fit)
     term.open(hostRef.current!)
     fit.fit()
-    term.writeln('\x1b[36mCPP://Web terminal\x1b[0m — output appears here. Input is forwarded to the running program.')
-    term.onData((d) => inputCb.current?.(d))
+    term.writeln('\x1b[36mCppPad terminal\x1b[0m — output appears here. Type input and press Enter; it is sent as stdin on the next Run.')
+
+    let line = ''
+    term.onData((d) => {
+      for (const ch of d) {
+        if (ch === '\r') {
+          term.write('\r\n')
+          inputCb.current?.(line + '\n')
+          line = ''
+        } else if (ch === '\x7f' || ch === '\b') {
+          if (line.length > 0) {
+            line = line.slice(0, -1)
+            term.write('\b \b')
+          }
+        } else if (ch >= ' ' && ch !== '\x7f') {
+          line += ch
+          term.write(ch)
+        }
+      }
+    })
     term.focus()
 
     const onResize = () => fit.fit()

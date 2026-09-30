@@ -40,7 +40,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
   try {
     const upstream = await fetch('https://wandbox.org/api/compile.json', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'User-Agent': 'CppPad/1.0' },
       body: JSON.stringify({ compiler: 'gcc-head', code, options: '', stdin }),
       signal: controller.signal
     })

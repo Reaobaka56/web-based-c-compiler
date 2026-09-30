@@ -16,6 +16,7 @@ export default function App() {
   const [busy, setBusy] = useState(false)
   const [guiOpen, setGuiOpen] = useState(false)
   const [guiOp, setGuiOp] = useState<GuiMessage | null>(null)
+  const [programInput, setProgramInput] = useState('')
   const termRef = useRef<TerminalHandle | null>(null)
   const hostRef = useRef<WorkerHost | null>(null)
   const filesRef = useRef(files)
@@ -73,7 +74,7 @@ export default function App() {
     try {
       const source = filesRef.current[active] ?? ''
       await writeFile(active, source)
-      const compiled = await compileProject(source, new AbortController().signal)
+      const compiled = await compileProject(source, new AbortController().signal, programInput)
       hostRef.current ??= new WorkerHost()
       setGuiOpen(true)
       hostRef.current.run(compiled, {
@@ -114,10 +115,7 @@ export default function App() {
   }, [])
 
   useEffect(() => {
-    termRef.current?.onInput((d) => {
-      if (d === '\r') hostRef.current?.sendStdin('\n')
-      else hostRef.current?.sendStdin(d)
-    })
+    termRef.current?.onInput((line) => setProgramInput((v) => v + line))
   }, [])
 
   return (
