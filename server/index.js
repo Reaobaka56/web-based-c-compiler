@@ -2,7 +2,7 @@ import express from 'express'
 
 const app = express()
 const port = Number(process.env.PORT) || 3001
-const frontendUrl = process.env.FRONTEND_URL
+const frontendUrl = process.env.FRONTEND_URL || 'https://web-based-c-compiler.vercel.app'
 
 app.use(express.json({ limit: '1mb' }))
 
