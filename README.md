@@ -1,6 +1,6 @@
 # CppPad: C++ in the browser
 
-A browser-based C++ editor with an IndexedDB-backed workspace and online compilation through Wandbox.
+A browser-based C++ editor with an IndexedDB-backed workspace and interactive C++ execution in a WASI sandbox.
 
 ## Quick start
 
@@ -9,19 +9,22 @@ npm install
 npm run dev
 ```
 
-Press Run to compile the active file with GCC through Wandbox. The compiler output and program output appear in the terminal.
+Press Run to compile the active file to WebAssembly. The terminal accepts input while the program is running.
 
-The source file is sent to Wandbox for compilation and execution. Do not use this service for confidential code. This version compiles one active source file at a time.
+Programs execute in Wasmtime with no host filesystem access. This service is for learning and should not be used for confidential code.
 
 ## Architecture
 
 ```
 api/
-└── compile.ts            Vercel serverless proxy to Wandbox (GCC)
+└── compile.ts            Vercel serverless fallback proxy to Wandbox
+
+server/
+└── index.js              HTTP API and interactive WebSocket sessions
 
 src/
 ├── App.tsx               layout, tabs, run orchestration
-├── compiler/clang.ts     client for /api/compile
+├── compiler/clang.ts     client for the Wandbox fallback API
 ├── editor/Editor.tsx     CodeMirror 6 (C++ syntax, light/dark)
 ├── fs/vfs.ts             IndexedDB-backed virtual file system
 ├── fs/FileManager.tsx    file list: create / open / delete
@@ -30,12 +33,12 @@ src/
 
 ## Deployment
 
-The Render Blueprint in `render.yaml` deploys the compiler API as `cpppad-compiler` and configures CORS for `https://web-based-c-compiler.vercel.app`. The API forwards compile requests to Wandbox, so the Render service does not need a local C++ toolchain.
+The Render Blueprint in `render.yaml` builds `Dockerfile` and deploys the interactive compiler as a separate Docker service named `cpppad-live` in Oregon. Render cannot convert the existing Node service to Docker, so create this service from the Blueprint and keep the old service until the new one is verified. The image includes wasi-sdk for compilation and Wasmtime for sandboxed execution. WebSockets carry terminal input and output between the Vercel frontend and the running process.
 
-After creating the Render service, set `VITE_API_URL` in the Vercel project's environment variables to the service's base URL, for example `https://cpppad-compiler.onrender.com` (without `/api`). Redeploy the Vercel project after changing the variable. Leave it unset for same-origin development or Vercel's built-in API route.
+Set `VITE_API_URL` in the Vercel project's environment variables to the new Render service's base URL, then redeploy Vercel. The browser connects to `/ws/run` on the Render service.
 
 ## Limits
 
-- One active file is compiled per run (max 64 KB).
-- No stdin and no GUI or graphics output, since programs run on Wandbox.
-- Compilation needs a network connection to Wandbox.
+- One active run at a time; source and input are limited to 64 KB, output to 1 MB, and execution to 120 seconds.
+- Programs have no host filesystem or network access. C++ exceptions are disabled in the WASI build.
+- Render's free instance may be slow to wake and compile larger programs.

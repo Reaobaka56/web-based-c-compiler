@@ -46,7 +46,7 @@ const Terminal = forwardRef<TerminalHandle>(function Terminal(_, ref) {
     term.loadAddon(fit)
     term.open(host)
     fit.fit()
-    term.writeln('\x1b[36mCppPad terminal\x1b[0m — output appears here. Input is sent as stdin on the next Run.')
+    term.writeln('\x1b[36mCppPad terminal\x1b[0m - output appears here; type responses here while your program is running.')
     term.onData((d) => inputCb.current?.(d))
 
     const resizeObserver = new ResizeObserver(() => fit.fit())

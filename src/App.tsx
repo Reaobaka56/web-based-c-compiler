@@ -5,7 +5,6 @@ import Editor from './editor/Editor'
 import Terminal, { TerminalHandle } from './terminal/Terminal'
 import RunResultPopup, { type RunResult } from './ui/RunResultPopup'
 import { ensureDefaultProject, readAll, writeFile } from './fs/vfs'
-import { compileProject } from './compiler/clang'
 
 const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform)
 const RUN_HINT = isMac ? '⌘↵' : 'Ctrl+Enter'
@@ -26,7 +25,6 @@ export default function App() {
   const [panelHeight, setPanelHeight] = useState(220)
   const [showFiles, setShowFiles] = useState(true)
   const [showTerminal, setShowTerminal] = useState(true)
-  const [stdin, setStdin] = useState('')
   const [popup, setPopup] = useState<{ fileName: string; result: RunResult | null } | null>(null)
   const [showPopup, setShowPopup] = useState(() => {
     try { return localStorage.getItem('showRunPopup') !== 'false' } catch { return true }
@@ -36,7 +34,8 @@ export default function App() {
     return saved === 'light' || saved === 'dark' ? saved : 'dark'
   })
   const termRef = useRef<TerminalHandle>(null)
-  const abortRef = useRef<AbortController | null>(null)
+  const sessionRef = useRef<WebSocket | null>(null)
+  const inputLineRef = useRef('')
   const filesRef = useRef(files)
   filesRef.current = files
 
@@ -63,7 +62,7 @@ export default function App() {
       const first = all['/main.cpp'] !== undefined ? '/main.cpp' : Object.keys(all).sort()[0]
       if (first) { setOpenTabs([first]); setActive(first) }
     })()
-    return () => abortRef.current?.abort()
+    return () => sessionRef.current?.close()
   }, [])
 
   const log = useCallback((s: string) => termRef.current?.write(s), [])
@@ -74,26 +73,29 @@ export default function App() {
 
   useEffect(() => {
     if (showLanding) return
-    let line = ''
     termRef.current?.onInput((data) => {
-      for (const ch of data) {
-        if (ch === '\r') {
-          log('\r\n')
-          const typed = line
-          line = ''
-          setStdin((value) => value + typed + '\n')
-        } else if (ch === '\x7f' || ch === '\b') {
-          if (line.length > 0) {
-            line = line.slice(0, -1)
-            log('\b \b')
+      const session = sessionRef.current
+      if (session?.readyState !== WebSocket.OPEN) return
+
+      if (data.startsWith('\x1b')) return
+      for (const character of data) {
+        if (character === '\r' || character === '\n') {
+          termRef.current?.write('\r\n')
+          session.send(JSON.stringify({ type: 'input', data: `${inputLineRef.current}\n` }))
+          inputLineRef.current = ''
+        } else if (character === '\x7f' || character === '\b') {
+          const characters = Array.from(inputLineRef.current)
+          if (characters.length > 0) {
+            inputLineRef.current = characters.slice(0, -1).join('')
+            termRef.current?.write('\b \b')
           }
-        } else if (ch >= ' ') {
-          line += ch
-          log(ch)
+        } else if (character >= ' ') {
+          inputLineRef.current += character
+          termRef.current?.write(character)
         }
       }
     })
-  }, [showLanding, log])
+  }, [showLanding])
 
   const openFile = useCallback(async (path: string) => {
     setFiles((f) => ({ ...f, [path]: f[path] ?? '' }))
@@ -122,54 +124,84 @@ export default function App() {
     writeFile(active, v)
   }, [active])
 
-  const run = useCallback(async () => {
+  const run = useCallback(() => {
     if (!active || busy) return
     setBusy(true)
+    setShowTerminal(true)
     termRef.current?.clear()
-    const controller = new AbortController()
-    abortRef.current = controller
+    inputLineRef.current = ''
+    setPopup(null)
     const fileName = active.replace(/^\//, '')
     const source = filesRef.current[active] ?? ''
     const t0 = performance.now()
-    if (showPopup) setPopup({ fileName, result: null })
-    try {
-      log('\x1b[2mSending source to Wandbox (GCC)…\x1b[0m\r\n')
-      const result = await compileProject(source, controller.signal, stdin)
-      const ms = performance.now() - t0
-      if (result.compilerOutput) log(result.compilerOutput.replace(/\n/g, '\r\n'))
-      if (result.compilerError) log(`\x1b[31m${result.compilerError.replace(/\n/g, '\r\n')}\x1b[0m`)
-      if (result.output) log(result.output.replace(/\n/g, '\r\n'))
-      if (result.programError) log(`\x1b[31m${result.programError.replace(/\n/g, '\r\n')}\x1b[0m`)
-      log(`\x1b[2mProcess exited with code ${result.status}\x1b[0m\r\n`)
-      if (showPopup && !controller.signal.aborted) {
+    const endpoint = new URL(import.meta.env.VITE_API_URL || window.location.origin)
+    endpoint.protocol = endpoint.protocol === 'https:' ? 'wss:' : 'ws:'
+    endpoint.pathname = '/ws/run'
+    endpoint.search = ''
+
+    let output = ''
+    let compileFailed = false
+    let exited = false
+    const finish = (exitCode: number) => {
+      if (exited) return
+      exited = true
+      log(`\x1b[2mProcess exited with code ${exitCode}\x1b[0m\r\n`)
+      if (sessionRef.current === session) sessionRef.current = null
+      setBusy(false)
+      if (showPopup) {
         setPopup({
           fileName,
-          result: {
-            fileName,
-            exitCode: result.status,
-            ms,
-            compileFailed: result.compilerError.length > 0 && result.output === '',
-            output: result.compilerError || result.output || result.programError
-          }
+          result: { fileName, exitCode, ms: performance.now() - t0, compileFailed: compileFailed || exitCode !== 0, output }
         })
       }
-    } catch (e: any) {
-      if (!controller.signal.aborted) {
-        const message = e?.message ?? String(e)
-        log(`\x1b[31mCompile error: ${message}\x1b[0m\r\n`)
-        if (showPopup) setPopup({ fileName, result: { fileName, exitCode: 1, ms: performance.now() - t0, compileFailed: true, output: message } })
+    }
+
+    const session = new WebSocket(endpoint)
+    sessionRef.current = session
+    session.onopen = () => {
+      log('\x1b[2mConnecting to interactive C++ runner…\x1b[0m\r\n')
+      session.send(JSON.stringify({ type: 'start', code: source }))
+      termRef.current?.focus()
+    }
+    session.onmessage = (event) => {
+      let message: { type?: string; message?: string; data?: string; code?: number }
+      try {
+        message = JSON.parse(String(event.data))
+      } catch {
+        return
       }
-    } finally {
-      if (abortRef.current === controller) {
-        abortRef.current = null
-        setBusy(false)
+      if (message.type === 'status' && message.message) log(message.message)
+      if (message.type === 'output' && message.data) {
+        output += message.data
+        log(message.data)
+      }
+      if (message.type === 'error' && message.message) {
+        compileFailed = true
+        output += `${message.message}\n`
+        log(`\x1b[31m${message.message}\x1b[0m\r\n`)
+      }
+      if (message.type === 'exit') finish(Number(message.code ?? 1))
+    }
+    session.onerror = () => {
+      if (exited) return
+      compileFailed = true
+      output += 'Could not connect to the interactive C++ runner.'
+      log('\x1b[31mCould not connect to the interactive C++ runner.\x1b[0m\r\n')
+    }
+    session.onclose = () => {
+      if (!exited && sessionRef.current === session) {
+        compileFailed = true
+        output += 'The interactive session ended unexpectedly.'
+        log('\x1b[31mThe interactive session ended unexpectedly.\x1b[0m\r\n')
+        finish(1)
       }
     }
-  }, [active, busy, log, stdin, showPopup])
+  }, [active, busy, log, showPopup])
 
   const stop = useCallback(() => {
-    abortRef.current?.abort()
-    abortRef.current = null
+    sessionRef.current?.close(1000, 'Stopped')
+    sessionRef.current = null
+    inputLineRef.current = ''
     setBusy(false)
     setPopup(null)
     log('\x1b[2mStopped\x1b[0m\r\n')
@@ -282,11 +314,6 @@ export default function App() {
             <div className="pane-head">
               <span>Terminal</span>
               <button className="text-btn" onClick={() => termRef.current?.clear()}>Clear</button>
-            </div>
-            <div className="stdin-row">
-              <label htmlFor="program-input">Program input</label>
-              <textarea id="program-input" value={stdin} onChange={(event) => setStdin(event.target.value)}
-                placeholder="Optional stdin; enter each response on a new line" spellCheck={false} rows={2} />
             </div>
             <div className="term-host"><Terminal ref={termRef} /></div>
           </section>

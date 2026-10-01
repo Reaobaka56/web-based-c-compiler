@@ -1,11 +1,11 @@
 services:
   - type: web
-    name: cpppad-compiler
-    env: node
+    name: cpppad-live
+    env: docker
     plan: free
     region: oregon
-    buildCommand: npm install
-    startCommand: npm start
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
     healthCheckPath: /health
     envVars:
       - key: NODE_VERSION
