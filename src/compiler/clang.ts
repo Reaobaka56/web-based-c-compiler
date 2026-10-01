@@ -6,8 +6,10 @@ export interface CompileResult {
   programError: string
 }
 
+const apiBaseUrl = import.meta.env.VITE_API_URL?.replace(/\/+$/, '') ?? ''
+
 export async function compileProject(sourceCode: string, signal: AbortSignal, stdin = ''): Promise<CompileResult> {
-  const response = await fetch('/api/compile', {
+  const response = await fetch(`${apiBaseUrl}/api/compile`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ compiler: 'gcc-head', code: sourceCode, options: '', stdin }),

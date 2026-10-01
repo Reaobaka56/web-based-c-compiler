@@ -1,8 +1,16 @@
 services:
   - type: web
-    name: cpppad
+    name: cpppad-compiler
     env: node
     plan: free
-    buildCommand: npm install && npm run build
+    region: oregon
+    buildCommand: npm install
     startCommand: npm start
     healthCheckPath: /health
+    envVars:
+      - key: NODE_VERSION
+        value: 22.16.0
+      - key: NODE_ENV
+        value: production
+      - key: FRONTEND_URL
+        value: https://web-based-c-compiler.vercel.app

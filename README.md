@@ -28,6 +28,12 @@ src/
 └── terminal/Terminal.tsx xterm.js output panel
 ```
 
+## Deployment
+
+The Render Blueprint in `render.yaml` deploys the compiler API as `cpppad-compiler` and configures CORS for `https://web-based-c-compiler.vercel.app`. The API forwards compile requests to Wandbox, so the Render service does not need a local C++ toolchain.
+
+After creating the Render service, set `VITE_API_URL` in the Vercel project's environment variables to the service's base URL, for example `https://cpppad-compiler.onrender.com` (without `/api`). Redeploy the Vercel project after changing the variable. Leave it unset for same-origin development or Vercel's built-in API route.
+
 ## Limits
 
 - One active file is compiled per run (max 64 KB).
