@@ -2,12 +2,16 @@ import express from 'express'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { spawn } from 'node:child_process'
 import { WebSocket, WebSocketServer } from 'ws'
 
 const app = express()
 const port = Number(process.env.PORT) || 3001
-const frontendUrl = (process.env.FRONTEND_URL || 'https://web-based-c-compiler.vercel.app').replace(/\/+$/, '')
+const shimDir = path.join(path.dirname(fileURLToPath(import.meta.url)), 'shim')
+const allowedOrigins = (process.env.FRONTEND_URL || 'https://web-based-c-compiler.vercel.app')
+  .split(',').map((s) => s.trim().replace(/\/+$/, '')).filter(Boolean)
+const isAllowedOrigin = (origin) => !!origin && allowedOrigins.includes(origin)
 const maxSourceBytes = 65_536
 const maxInputBytes = 65_536
 const maxOutputBytes = 1_048_576
@@ -18,13 +22,13 @@ app.use(express.json({ limit: '1mb' }))
 
 app.use('/api', (req, res, next) => {
   const origin = req.get('origin')
-  if (origin && origin === frontendUrl) {
+  if (origin && isAllowedOrigin(origin)) {
     res.setHeader('Access-Control-Allow-Origin', origin)
     res.setHeader('Vary', 'Origin')
   }
 
   if (req.method === 'OPTIONS') {
-    if (origin !== frontendUrl) return res.sendStatus(403)
+    if (!isAllowedOrigin(origin)) return res.sendStatus(403)
     res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
     return res.sendStatus(204)
@@ -35,55 +39,6 @@ app.use('/api', (req, res, next) => {
 
 app.get('/health', (_req, res) => {
   res.json({ ok: true, service: 'cppad-live' })
-})
-
-app.post('/api/compile', async (req, res) => {
-  const body = req.body ?? {}
-  const code = typeof body.code === 'string' ? body.code : ''
-  const stdin = typeof body.stdin === 'string' ? body.stdin : ''
-
-  if (!code.trim()) {
-    return res.status(400).json({ error: 'C++ source code is required.' })
-  }
-  if (code.length > 65_536) {
-    return res.status(413).json({ error: 'Source is too large (maximum 64 KB).' })
-  }
-  if (typeof body.stdin !== 'undefined' && typeof body.stdin !== 'string') {
-    return res.status(400).json({ error: 'Program input must be text.' })
-  }
-  if (stdin.length > 65_536) {
-    return res.status(413).json({ error: 'Program input is too large (maximum 64 KB).' })
-  }
-
-  const controller = new AbortController()
-  const timeout = setTimeout(() => controller.abort(), 25_000)
-  try {
-    const upstream = await fetch('https://wandbox.org/api/compile.json', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ compiler: 'gcc-head', code, options: '', stdin }),
-      signal: controller.signal
-    })
-    if (!upstream.ok) {
-      return res.status(502).json({ error: `Compiler service returned ${upstream.status}.` })
-    }
-
-    const result = await upstream.json()
-    return res.status(200).json({
-      status: Number(result.status ?? 1),
-      compilerOutput: typeof result.compiler_message === 'string' ? result.compiler_message : '',
-      compilerError: typeof result.compiler_error === 'string' ? result.compiler_error : '',
-      output: typeof result.program_output === 'string' ? result.program_output : '',
-      programError: typeof result.program_error === 'string' ? result.program_error : ''
-    })
-  } catch (error) {
-    const message = error instanceof Error && error.name === 'AbortError'
-      ? 'Compilation timed out. Try a smaller or faster program.'
-      : 'Could not reach the online compiler. Check your connection and try again.'
-    return res.status(502).json({ error: message })
-  } finally {
-    clearTimeout(timeout)
-  }
 })
 
 const server = app.listen(port, () => {
@@ -97,7 +52,7 @@ server.on('upgrade', (request, socket, head) => {
   const origin = request.headers.origin
   const localOrigin = process.env.NODE_ENV !== 'production' && /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin ?? '')
 
-  if (requestUrl.pathname !== '/ws/run' || (origin !== frontendUrl && !localOrigin)) {
+  if (requestUrl.pathname !== '/ws/run' || (!isAllowedOrigin(origin) && !localOrigin)) {
     socket.write('HTTP/1.1 403 Forbidden\r\n\r\n')
     socket.destroy()
     return
@@ -111,6 +66,13 @@ server.on('upgrade', (request, socket, head) => {
 function send(websocket, message) {
   if (websocket.readyState === WebSocket.OPEN) websocket.send(JSON.stringify(message))
 }
+
+const HINTS = [
+  [/'(conio|windows)\.h' file not found/, 'Hint: Windows-only header. Not available here; use <iostream> instead.'],
+  [/cannot use '(throw|try)' with exceptions disabled/, 'Hint: C++ exceptions are disabled in this runner. Remove try/catch/throw and use return codes.'],
+  [/<thread> is not supported|'(thread|mutex|atomic)' file not found/, 'Hint: threads are not supported in this WASI runner.'],
+  [/'(filesystem|sys\/socket\.h|unistd\.h)' file not found/, 'Hint: no host filesystem or network access in this sandbox.']
+]
 
 function startWasiRun(websocket, code, session) {
   session.tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cpppad-'))
@@ -160,7 +122,7 @@ function startWasiRun(websocket, code, session) {
 
   send(websocket, { type: 'status', message: 'Compiling C++ to WebAssembly…\r\n' })
   const compiler = spawn('/opt/wasi-sdk/bin/clang++', [
-      '-std=c++17', '-O2', '-fno-exceptions', '-Wl,-z,stack-size=1048576', sourcePath, '-o', wasmPath
+      '-std=c++17', '-O2', '-fno-exceptions', '-isystem', shimDir, '-Wl,-z,stack-size=1048576', sourcePath, '-o', wasmPath
   ], {
     cwd: session.tempDir,
     env: { PATH: '/opt/wasi-sdk/bin:/usr/local/bin:/usr/bin:/bin', HOME: '/tmp', LANG: 'C.UTF-8' },
@@ -168,13 +130,23 @@ function startWasiRun(websocket, code, session) {
   })
   session.process = compiler
   session.timer = setTimeout(() => fail('Compilation exceeded the 20 second limit.'), 20_000)
-  compiler.stdout.on('data', writeOutput)
-  compiler.stderr.on('data', writeOutput)
+  let compilerText = ''
+  const onCompilerData = (chunk) => {
+    compilerText += chunk.toString()
+    writeOutput(chunk)
+  }
+  compiler.stdout.on('data', onCompilerData)
+  compiler.stderr.on('data', onCompilerData)
   compiler.on('error', (error) => fail(`Compiler error: ${error.message}`))
   compiler.on('close', (exitCode) => {
     if (session.finished) return
     clearTimeout(session.timer)
-    if (exitCode !== 0) return finish(exitCode)
+    if (exitCode !== 0) {
+      for (const [pattern, hint] of HINTS) {
+        if (pattern.test(compilerText)) send(websocket, { type: 'output', data: `\r\n\x1b[33m${hint}\x1b[0m\r\n` })
+      }
+      return finish(exitCode)
+    }
 
     send(websocket, { type: 'status', message: 'Program started. Type input in the terminal.\r\n' })
     const program = spawn('/usr/local/bin/wasmtime', [

@@ -16,15 +16,11 @@ Programs execute in Wasmtime with no host filesystem access. This service is for
 ## Architecture
 
 ```
-api/
-└── compile.ts            Vercel serverless fallback proxy to Wandbox
-
 server/
 └── index.js              HTTP API and interactive WebSocket sessions
 
 src/
 ├── App.tsx               layout, tabs, run orchestration
-├── compiler/clang.ts     client for the Wandbox fallback API
 ├── editor/Editor.tsx     CodeMirror 6 (C++ syntax, light/dark)
 ├── fs/vfs.ts             IndexedDB-backed virtual file system
 ├── fs/FileManager.tsx    file list: create / open / delete

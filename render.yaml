@@ -13,4 +13,4 @@ services:
       - key: NODE_ENV
         value: production
       - key: FRONTEND_URL
-        value: https://web-based-c-compiler.vercel.app
+        value: https://web-based-c-compiler.vercel.app,https://<your-custom-domain>

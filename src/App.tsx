@@ -45,6 +45,11 @@ export default function App() {
   }, [theme])
 
   useEffect(() => {
+    const base = (import.meta.env.VITE_API_URL || window.location.origin).replace(/\/+$/, '')
+    fetch(`${base}/health`, { mode: 'no-cors' }).catch(() => {})
+  }, [])
+
+  useEffect(() => {
     if (!showWelcome) return
     const dismissOnEscape = (event: KeyboardEvent) => {
       if (event.key === 'Escape') setShowWelcome(false)
@@ -185,8 +190,9 @@ export default function App() {
     session.onerror = () => {
       if (exited) return
       compileFailed = true
-      output += 'Could not connect to the interactive C++ runner.'
-      log('\x1b[31mCould not connect to the interactive C++ runner.\x1b[0m\r\n')
+      const msg = `Could not connect to the runner at ${endpoint.host}. Check VITE_API_URL (Vercel) and FRONTEND_URL (Render), and wait ~30s if the free instance is waking up.`
+      output += msg
+      log(`\x1b[31m${msg}\x1b[0m\r\n`)
     }
     session.onclose = () => {
       if (!exited && sessionRef.current === session) {
@@ -322,8 +328,8 @@ export default function App() {
 
       <footer className="statusbar">
         <div className="status-group">
-          <span className="status-item" title="Your active source file is sent to Wandbox for compilation and execution.">
-            GCC via Wandbox
+          <span className="status-item" title="Your active file is compiled to WebAssembly and run in Wasmtime on the server.">
+            clang++ · WASI sandbox
           </span>
           {busy && <span className="status-item">Running</span>}
         </div>
