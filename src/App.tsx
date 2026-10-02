@@ -137,7 +137,6 @@ export default function App() {
     inputLineRef.current = ''
     setPopup(null)
     const fileName = active.replace(/^\//, '')
-    const source = filesRef.current[active] ?? ''
     const t0 = performance.now()
     const endpoint = new URL(import.meta.env.VITE_API_URL || window.location.origin)
     endpoint.protocol = endpoint.protocol === 'https:' ? 'wss:' : 'ws:'
@@ -165,7 +164,7 @@ export default function App() {
     sessionRef.current = session
     session.onopen = () => {
       log('\x1b[2mConnecting to interactive C++ runner…\x1b[0m\r\n')
-      session.send(JSON.stringify({ type: 'start', code: source }))
+      session.send(JSON.stringify({ type: 'start', entry: active, files: filesRef.current }))
       termRef.current?.focus()
     }
     session.onmessage = (event) => {

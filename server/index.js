@@ -15,8 +15,95 @@ const isAllowedOrigin = (origin) => !!origin && allowedOrigins.includes(origin)
 const maxSourceBytes = 65_536
 const maxInputBytes = 65_536
 const maxOutputBytes = 1_048_576
-const maxActiveRuns = 1
+const maxActiveRuns = Number(process.env.MAX_ACTIVE_RUNS) || 10
+const maxRunsPerIp = Number(process.env.MAX_RUNS_PER_IP) || 3
+const maxConcurrentCompiles = Number(process.env.MAX_CONCURRENT_COMPILES) || 2
+const maxQueuedCompiles = 20
+const runMemoryBytes = (Number(process.env.RUN_MEMORY_MB) || 64) * 1024 * 1024
+const maxProjectFiles = 20
+const maxProjectBytes = 262_144
 let activeRuns = 0
+let activeCompiles = 0
+const compileQueue = []
+const runsByIp = new Map()
+
+function acquireCompileSlot(session, start) {
+  if (activeCompiles < maxConcurrentCompiles) {
+    activeCompiles += 1
+    session.hasSlot = true
+    start()
+  } else {
+    compileQueue.push({ session, start })
+  }
+}
+
+function releaseCompileSlot(session) {
+  if (!session.hasSlot) return
+  session.hasSlot = false
+  activeCompiles = Math.max(0, activeCompiles - 1)
+  while (activeCompiles < maxConcurrentCompiles && compileQueue.length) {
+    const next = compileQueue.shift()
+    if (next.session.finished) continue
+    activeCompiles += 1
+    next.session.hasSlot = true
+    next.start()
+  }
+}
+
+const SAFE_PATH = /^[A-Za-z0-9_][A-Za-z0-9_.\-/]*$/
+const SOURCE_EXT = /\.(cpp|cc|cxx)$/i
+const ANY_EXT = /\.(cpp|cc|cxx|h|hpp|hh|inl)$/i
+
+function cleanPath(raw) {
+  if (typeof raw !== 'string') return null
+  const normalized = path.posix.normalize(raw.replace(/^\/+/, ''))
+  if (normalized.length > 100 || normalized.startsWith('..') || normalized.includes('/../')) return null
+  if (!SAFE_PATH.test(normalized) || !ANY_EXT.test(normalized)) return null
+  return normalized
+}
+
+function hasUnsafeInclude(text) {
+  if (/#\s*(?:include|include_next|import)\s*(?![\s"<])/.test(text)) return true
+  for (const match of text.matchAll(/#\s*(?:include|include_next|import)\s*["<]([^">\n]*)[">]/g)) {
+    const target = match[1].trim()
+    if (target.startsWith('/') || target.startsWith('~') || target.includes('..')) return true
+  }
+  return false
+}
+
+// Accepts { files: {path: text}, entry } or legacy { code }. Returns { files, entry } or { error }.
+function parseProject(message) {
+  const rawFiles = message.files && typeof message.files === 'object' && !Array.isArray(message.files)
+    ? message.files
+    : typeof message.code === 'string' ? { [message.entry || 'main.cpp']: message.code } : null
+  if (!rawFiles) return { error: 'No source files were sent.' }
+
+  const files = {}
+  let total = 0
+  for (const [rawName, content] of Object.entries(rawFiles)) {
+    const name = cleanPath(rawName)
+    if (!name || typeof content !== 'string') continue
+    const size = Buffer.byteLength(content)
+    if (size > maxSourceBytes) return { error: `${name} is too large (maximum 64 KB per file).` }
+    total += size
+    files[name] = content
+  }
+  const names = Object.keys(files)
+  if (names.length === 0) return { error: 'No valid C++ files (.cpp, .h, .hpp) to compile.' }
+  if (names.length > maxProjectFiles) return { error: `Too many files (maximum ${maxProjectFiles}).` }
+  if (total > maxProjectBytes) return { error: 'Project is too large (maximum 256 KB).' }
+
+  const entry = cleanPath(message.entry) ?? (files['main.cpp'] !== undefined ? 'main.cpp' : names.find((n) => SOURCE_EXT.test(n)))
+  if (!entry || files[entry] === undefined || !SOURCE_EXT.test(entry)) return { error: 'Open a .cpp file to run.' }
+  if (!files[entry].trim()) return { error: 'The file is empty.' }
+  for (const name of names) {
+    if (hasUnsafeInclude(files[name])) return { error: `${name}: absolute or parent-directory #include paths are not allowed.` }
+  }
+
+  // Compile the entry plus every other .cpp that does not define its own main().
+  const sources = [entry, ...names.filter((n) => n !== entry && SOURCE_EXT.test(n) && !/\bmain\s*\(/.test(files[n]))]
+  return { files, entry, sources }
+}
 
 app.use(express.json({ limit: '1mb' }))
 
@@ -59,7 +146,7 @@ server.on('upgrade', (request, socket, head) => {
   }
 
   websocketServer.handleUpgrade(request, socket, head, (websocket) => {
-    websocketServer.emit('connection', websocket)
+    websocketServer.emit('connection', websocket, request)
   })
 })
 
@@ -74,11 +161,15 @@ const HINTS = [
   [/'(filesystem|sys\/socket\.h|unistd\.h)' file not found/, 'Hint: no host filesystem or network access in this sandbox.']
 ]
 
-function startWasiRun(websocket, code, session) {
+function startWasiRun(websocket, project, session) {
   session.tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cpppad-'))
-  const sourcePath = path.join(session.tempDir, 'main.cpp')
   const wasmPath = path.join(session.tempDir, 'main.wasm')
-  fs.writeFileSync(sourcePath, code)
+  for (const [name, content] of Object.entries(project.files)) {
+    const target = path.join(session.tempDir, name)
+    fs.mkdirSync(path.dirname(target), { recursive: true })
+    fs.writeFileSync(target, content)
+  }
+  const sourcePaths = project.sources.map((name) => path.join(session.tempDir, name))
 
   const cleanup = () => {
     clearTimeout(session.timer)
@@ -120,9 +211,17 @@ function startWasiRun(websocket, code, session) {
     send(websocket, { type: 'output', data: chunk.toString() })
   }
 
+  if (compileQueue.length >= maxQueuedCompiles) {
+    fail('The compiler is busy. Try again shortly.')
+    return
+  }
+  if (activeCompiles >= maxConcurrentCompiles) {
+    send(websocket, { type: 'status', message: 'Waiting for a free compiler slot…\r\n' })
+  }
+  acquireCompileSlot(session, () => {
   send(websocket, { type: 'status', message: 'Compiling C++ to WebAssembly…\r\n' })
   const compiler = spawn('/opt/wasi-sdk/bin/clang++', [
-      '-std=c++17', '-O2', '-fno-exceptions', '-isystem', shimDir, '-Wl,-z,stack-size=1048576', sourcePath, '-o', wasmPath
+      '-std=c++17', '-O2', '-fno-exceptions', '-isystem', shimDir, '-I', session.tempDir, '-Wl,-z,stack-size=1048576', ...sourcePaths, '-o', wasmPath
   ], {
     cwd: session.tempDir,
     env: { PATH: '/opt/wasi-sdk/bin:/usr/local/bin:/usr/bin:/bin', HOME: '/tmp', LANG: 'C.UTF-8' },
@@ -137,8 +236,12 @@ function startWasiRun(websocket, code, session) {
   }
   compiler.stdout.on('data', onCompilerData)
   compiler.stderr.on('data', onCompilerData)
-  compiler.on('error', (error) => fail(`Compiler error: ${error.message}`))
+  compiler.on('error', (error) => {
+    releaseCompileSlot(session)
+    fail(`Compiler error: ${error.message}`)
+  })
   compiler.on('close', (exitCode) => {
+    releaseCompileSlot(session)
     if (session.finished) return
     clearTimeout(session.timer)
     if (exitCode !== 0) {
@@ -150,7 +253,7 @@ function startWasiRun(websocket, code, session) {
 
     send(websocket, { type: 'status', message: 'Program started. Type input in the terminal.\r\n' })
     const program = spawn('/usr/local/bin/wasmtime', [
-        'run', '-W', 'fuel=1000000000', '-W', 'max-memory-size=268435456', wasmPath
+      'run', '-W', 'fuel=1000000000', '-W', `max-memory-size=${runMemoryBytes}`, wasmPath
     ], {
       cwd: session.tempDir,
       env: { PATH: '/usr/local/bin:/usr/bin:/bin', LANG: 'C.UTF-8' },
@@ -172,11 +275,19 @@ function startWasiRun(websocket, code, session) {
       session.inputQueue = ''
     }
   })
+  })
 }
 
-websocketServer.on('connection', (websocket) => {
+function clientIp(request) {
+  const forwarded = String(request.headers['x-forwarded-for'] || '').split(',')[0].trim()
+  return forwarded || request.socket.remoteAddress || 'unknown'
+}
+
+websocketServer.on('connection', (websocket, request) => {
+  const ip = clientIp(request)
   const session = { process: null, timer: null, tempDir: null, inputQueue: '', inputBytes: 0, outputBytes: 0, finished: false, running: false }
   let started = false
+  let counted = false
   const startTimer = setTimeout(() => websocket.close(1008, 'Start message required'), 10_000)
 
   websocket.on('message', (frame, isBinary) => {
@@ -194,13 +305,14 @@ websocketServer.on('connection', (websocket) => {
     }
 
     if (!started) {
-      if (message.type !== 'start' || typeof message.code !== 'string' || !message.code.trim()) {
-        websocket.close(1008, 'A C++ source file is required')
+      if (message.type !== 'start') {
+        websocket.close(1008, 'A start message is required')
         return
       }
-      if (Buffer.byteLength(message.code) > maxSourceBytes) {
-        send(websocket, { type: 'error', message: 'Source is too large (maximum 64 KB).' })
-        websocket.close(1009, 'Source too large')
+      const project = parseProject(message)
+      if (project.error) {
+        send(websocket, { type: 'error', message: project.error })
+        websocket.close(1008, 'Invalid project')
         return
       }
       if (activeRuns >= maxActiveRuns) {
@@ -208,11 +320,18 @@ websocketServer.on('connection', (websocket) => {
         websocket.close(1013, 'Compiler busy')
         return
       }
+      if ((runsByIp.get(ip) || 0) >= maxRunsPerIp) {
+        send(websocket, { type: 'error', message: `Too many runs from your connection (maximum ${maxRunsPerIp} at once). Stop one first.` })
+        websocket.close(1013, 'Too many runs')
+        return
+      }
 
       started = true
+      counted = true
       clearTimeout(startTimer)
       activeRuns += 1
-      startWasiRun(websocket, message.code, session)
+      runsByIp.set(ip, (runsByIp.get(ip) || 0) + 1)
+      startWasiRun(websocket, project, session)
       return
     }
 
@@ -243,6 +362,12 @@ websocketServer.on('connection', (websocket) => {
 
   websocket.on('close', () => {
     clearTimeout(startTimer)
+    if (counted) {
+      counted = false
+      const remaining = (runsByIp.get(ip) || 1) - 1
+      if (remaining <= 0) runsByIp.delete(ip)
+      else runsByIp.set(ip, remaining)
+    }
     if (session.finished) return
     session.finished = true
     clearTimeout(session.timer)
