@@ -595,6 +595,8 @@ ul { list-style: none; }
 
 @media (prefers-reduced-motion: reduce) { .spinner, .run-popup-bar span { animation-duration: 2.4s; } }
 
+.mobile-overflow { display: none; }
+
 @media (max-width: 640px) {
   .app { height: 100dvh; min-height: 0; overflow: hidden; }
   .topbar {
@@ -679,6 +681,9 @@ ul { list-style: none; }
     transform: translateX(-105%);
   }
   .sidebar.mobile-open { pointer-events: auto; transform: translateX(0); }
+  .file-item { min-height: 44px; }
+  .file-row { min-height: 44px; }
+  .row-del { width: 44px; height: 44px; margin-right: 2px; opacity: 1; }
   .body { position: relative; min-width: 0; min-height: 0; overflow: hidden; }
   .center { width: 100%; min-width: 0; min-height: 0; }
   .tabs { flex: 0 0 44px; height: 44px; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; }

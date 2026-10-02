@@ -299,8 +299,9 @@ export default function App() {
 
   const startResize = (e: React.PointerEvent<HTMLDivElement>) => {
     e.currentTarget.setPointerCapture(e.pointerId)
+    const statusHeight = document.querySelector('.statusbar')?.getBoundingClientRect().height ?? STATUS_BAR_HEIGHT
     const move = (ev: PointerEvent) => {
-      const h = window.innerHeight - STATUS_BAR_HEIGHT - ev.clientY
+      const h = window.innerHeight - statusHeight - ev.clientY
       setPanelHeight(Math.max(MIN_PANEL, Math.min(window.innerHeight - 200, h)))
     }
     const up = () => {
@@ -422,15 +423,15 @@ export default function App() {
 
       <footer className="statusbar">
         <div className="status-group">
-          <span className="status-item" title="Your active file is compiled to WebAssembly and run in Wasmtime on the server.">
+          <span className="status-item compiler-status" title="Your active file is compiled to WebAssembly and run in Wasmtime on the server.">
             clang++ · WASI sandbox
           </span>
-          {backendStatus && <span className="status-item">{backendStatus}</span>}
+          {backendStatus && <span className="status-item backend-status">{backendStatus}</span>}
           {busy && <span className="status-item">Running</span>}
         </div>
         <div className="status-group">
-          <span className="status-item">Ln {cursor.line}, Col {cursor.col}</span>
-          <span className="status-item">C++</span>
+          <span className="status-item cursor-status">Ln {cursor.line}, Col {cursor.col}</span>
+          <span className="status-item language-status">C++</span>
           <span className="status-item copyright">© 2026 NullEntity · CMPG 172 Project</span>
         </div>
       </footer>
