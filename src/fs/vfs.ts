@@ -40,7 +40,7 @@ export async function readAll(): Promise<Record<string, string>> {
   return out
 }
 
-const LINKED_LIST_EXAMPLE = [
+export const LINKED_LIST_EXAMPLE = [
   '#include <iostream>',
   '#include <string>',
   '',
@@ -150,6 +150,29 @@ const LINKED_LIST_EXAMPLE = [
   ''
 ].join('\n')
 
+const PREVIOUS_DEFAULT = [
+  '#include <iostream>',
+  '',
+  'int main() {',
+  '    std::cout << "Hello, World!" << std::endl;',
+  '    return 0;',
+  '}',
+  ''
+].join('\n')
+
+const LEGACY_MAIN = [
+  '#include <iostream>',
+  '',
+  'int main() {',
+  '    std::cout << "Hello from CPP://Web!" << std::endl;',
+  '    std::cout << "Toolchain check: edit me and press Run." << std::endl;',
+  '    return 0;',
+  '}',
+  ''
+].join('\n')
+
+const DEFAULT_PROJECT: Record<string, string> = { '/main.cpp': LINKED_LIST_EXAMPLE }
+
 const LEGACY_GUI_DEMO = [
   'extern "C" {',
   '    void gui_clear(int r, int g, int b);',
@@ -167,9 +190,20 @@ const LEGACY_GUI_DEMO = [
 ].join('\n')
 
 export async function ensureDefaultProject(): Promise<void> {
-  await writeFile('/main.cpp', LINKED_LIST_EXAMPLE)
+  const existing = await listFiles()
+  if (existing.length === 0) {
+    for (const [path, content] of Object.entries(DEFAULT_PROJECT)) await writeFile(path, content)
+    return
+  }
 
-  if ((await listFiles()).includes('/gui_demo.cpp') && await readFile('/gui_demo.cpp') === LEGACY_GUI_DEMO) {
+  if (existing.includes('/main.cpp')) {
+    const main = await readFile('/main.cpp')
+    if (main === PREVIOUS_DEFAULT || main === LEGACY_MAIN) {
+      await writeFile('/main.cpp', LINKED_LIST_EXAMPLE)
+    }
+  }
+
+  if (existing.includes('/gui_demo.cpp') && await readFile('/gui_demo.cpp') === LEGACY_GUI_DEMO) {
     await deleteFile('/gui_demo.cpp')
   }
 }

@@ -21,7 +21,7 @@ export default function App() {
   const [files, setFiles] = useState<Record<string, string>>({})
   const [openTabs, setOpenTabs] = useState<string[]>([])
   const [active, setActive] = useState<string | null>(null)
-  const [showLanding, setShowLanding] = useState(false)
+  const [showLanding, setShowLanding] = useState(true)
   const [showWelcome, setShowWelcome] = useState(false)
   const [refreshKey, setRefreshKey] = useState(0)
   const [busy, setBusy] = useState(false)
