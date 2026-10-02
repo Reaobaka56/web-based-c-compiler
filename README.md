@@ -31,10 +31,27 @@ src/
 
 The Render Blueprint in `render.yaml` builds `Dockerfile` and deploys the interactive compiler as a separate Docker service named `cpppad-live` in Oregon. Render cannot convert the existing Node service to Docker, so create this service from the Blueprint and keep the old service until the new one is verified. The image includes wasi-sdk for compilation and Wasmtime for sandboxed execution. WebSockets carry terminal input and output between the Vercel frontend and the running process.
 
-Set `VITE_API_URL` in the Vercel project's environment variables to the new Render service's base URL, then redeploy Vercel. The browser connects to `/ws/run` on the Render service.
+For low-cost Render free tiers, the backend can be deployed as multiple instances (`api-1`, `api-2`, `api-3`) behind a single frontend. The frontend tries each backend in order and checks `/health` before connecting to `/ws/run`. This keeps traffic on the first available instance and only moves to the next one when the current one is full, down, or still waking up.
+
+Set the frontend environment variable `VITE_BACKENDS` to a comma-separated list in priority order, such as:
+
+```bash
+VITE_BACKENDS=https://api-1.onrender.com,https://api-2.onrender.com,https://api-3.onrender.com
+```
+
+For each backend service, configure:
+
+```bash
+PORT=3001
+MAX_CONCURRENT_RUNS=3
+ALLOWED_ORIGINS=https://your-frontend.example.com
+```
+
+`/health` returns a lightweight JSON object with active run count, queue length, configured max, and status. It is intentionally cheap and does not compile or access disk.
 
 ## Limits
 
-- One active run at a time; source and input are limited to 64 KB, output to 1 MB, and execution to 120 seconds.
+- The default low-resource safety settings are `MAX_CONCURRENT_RUNS=3`, `MAX_CONCURRENT_COMPILES=1`, `MAX_RUNS_PER_IP=3`, and `RUN_MEMORY_MB=32` when not overridden.
+- Source and input are limited to 64 KB, output to 1 MB, and execution to 120 seconds.
 - Programs have no host filesystem or network access. C++ exceptions are disabled in the WASI build.
-- Render's free instance may be slow to wake and compile larger programs.
+- Render's free instance may be slow to wake and compile larger programs; the health check is designed to wait up to 60 seconds before trying the next backend.

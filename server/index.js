@@ -9,13 +9,14 @@ import { WebSocket, WebSocketServer } from 'ws'
 const app = express()
 const port = Number(process.env.PORT) || 3001
 const shimDir = path.join(path.dirname(fileURLToPath(import.meta.url)), 'shim')
-const allowedOrigins = (process.env.FRONTEND_URL || 'https://web-based-c-compiler.vercel.app')
+const allowedOrigins = (process.env.ALLOWED_ORIGINS || process.env.FRONTEND_URL || 'https://web-based-c-compiler.vercel.app')
   .split(',').map((s) => s.trim().replace(/\/+$/, '')).filter(Boolean)
 const isAllowedOrigin = (origin) => !!origin && allowedOrigins.includes(origin)
 const maxSourceBytes = 65_536
 const maxInputBytes = 65_536
 const maxOutputBytes = 1_048_576
-const maxActiveRuns = Number(process.env.MAX_ACTIVE_RUNS) || 3
+const maxConcurrentRuns = Number(process.env.MAX_CONCURRENT_RUNS) || Number(process.env.MAX_ACTIVE_RUNS) || 2
+const maxActiveRuns = maxConcurrentRuns
 const maxRunsPerIp = Number(process.env.MAX_RUNS_PER_IP) || 3
 const maxConcurrentCompiles = Number(process.env.MAX_CONCURRENT_COMPILES) || 1
 const maxQueuedCompiles = 20
@@ -107,7 +108,7 @@ function parseProject(message) {
 
 app.use(express.json({ limit: '1mb' }))
 
-app.use('/api', (req, res, next) => {
+app.use((req, res, next) => {
   const origin = req.get('origin')
   if (origin && isAllowedOrigin(origin)) {
     res.setHeader('Access-Control-Allow-Origin', origin)
@@ -115,8 +116,8 @@ app.use('/api', (req, res, next) => {
   }
 
   if (req.method === 'OPTIONS') {
-    if (!isAllowedOrigin(origin)) return res.sendStatus(403)
-    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
+    if (!origin || !isAllowedOrigin(origin)) return res.sendStatus(403)
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
     return res.sendStatus(204)
   }
@@ -124,8 +125,12 @@ app.use('/api', (req, res, next) => {
   next()
 })
 
+app.use('/api', (req, res, next) => {
+  next()
+})
+
 app.get('/health', (_req, res) => {
-  res.json({ ok: true, service: 'cppad-live' })
+  res.json({ active: activeRuns, queued: compileQueue.length, max: maxActiveRuns, ok: true })
 })
 
 const server = app.listen(port, () => {

@@ -10,6 +10,10 @@ const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigat
 const RUN_HINT = isMac ? '⌘↵' : 'Ctrl+Enter'
 const STATUS_BAR_HEIGHT = 24
 const MIN_PANEL = 80
+const BACKENDS = (import.meta.env.VITE_BACKENDS || window.location.origin)
+  .split(',')
+  .map((value: string) => value.trim().replace(/\/+$/, ''))
+  .filter(Boolean)
 
 type Theme = 'dark' | 'light'
 
@@ -26,6 +30,7 @@ export default function App() {
   const [showFiles, setShowFiles] = useState(true)
   const [showTerminal, setShowTerminal] = useState(true)
   const [popup, setPopup] = useState<{ fileName: string; result: RunResult | null } | null>(null)
+  const [backendStatus, setBackendStatus] = useState('')
   const [showPopup, setShowPopup] = useState(() => {
     try { return localStorage.getItem('showRunPopup') !== 'false' } catch { return true }
   })
@@ -43,11 +48,6 @@ export default function App() {
     document.documentElement.setAttribute('data-theme', theme)
     try { localStorage.setItem('theme', theme) } catch { /* storage blocked */ }
   }, [theme])
-
-  useEffect(() => {
-    const base = (import.meta.env.VITE_API_URL || window.location.origin).replace(/\/+$/, '')
-    fetch(`${base}/health`, { mode: 'no-cors' }).catch(() => {})
-  }, [])
 
   useEffect(() => {
     if (!showWelcome) return
@@ -129,79 +129,118 @@ export default function App() {
     writeFile(active, v)
   }, [active])
 
-  const run = useCallback(() => {
+  const pickBackend = useCallback(async (): Promise<string | null> => {
+    for (const backend of BACKENDS) {
+      try {
+        const controller = new AbortController()
+        const timeout = window.setTimeout(() => controller.abort(), 60_000)
+        const response = await fetch(`${backend}/health`, {
+          cache: 'no-store',
+          signal: controller.signal,
+          headers: { Accept: 'application/json' }
+        })
+        window.clearTimeout(timeout)
+
+        if (!response.ok) continue
+        const payload = await response.json() as { ok?: boolean; active?: number; max?: number }
+        if (payload.ok && typeof payload.active === 'number' && typeof payload.max === 'number' && payload.active < payload.max) {
+          return backend
+        }
+      } catch {
+        // Move to the next backend if this one is down or just waking up.
+      }
+    }
+    return null
+  }, [])
+
+  const run = useCallback(async () => {
     if (!active || busy) return
     setBusy(true)
     setShowTerminal(true)
     termRef.current?.clear()
     inputLineRef.current = ''
     setPopup(null)
+    setBackendStatus('Connecting... (server may be waking up, up to 60s)')
+
     const fileName = active.replace(/^\//, '')
     const t0 = performance.now()
-    const endpoint = new URL(import.meta.env.VITE_API_URL || window.location.origin)
-    endpoint.protocol = endpoint.protocol === 'https:' ? 'wss:' : 'ws:'
-    endpoint.pathname = '/ws/run'
-    endpoint.search = ''
-
     let output = ''
     let compileFailed = false
     let exited = false
-    const finish = (exitCode: number) => {
-      if (exited) return
-      exited = true
-      log(`\x1b[2mProcess exited with code ${exitCode}\x1b[0m\r\n`)
-      if (sessionRef.current === session) sessionRef.current = null
-      setBusy(false)
-      if (showPopup) {
-        setPopup({
-          fileName,
-          result: { fileName, exitCode, ms: performance.now() - t0, compileFailed: compileFailed || exitCode !== 0, output }
-        })
+
+    const connectSession = async () => {
+      const backend = await pickBackend()
+      if (!backend) {
+        setBusy(false)
+        setBackendStatus('All servers busy, try again in a minute')
+        return
+      }
+
+      const endpoint = new URL(`${backend}/ws/run`)
+      endpoint.protocol = endpoint.protocol === 'https:' ? 'wss:' : 'ws:'
+      endpoint.search = ''
+
+      const session = new WebSocket(endpoint)
+      sessionRef.current = session
+
+      const finish = (exitCode: number) => {
+        if (exited) return
+        exited = true
+        log(`\x1b[2mProcess exited with code ${exitCode}\x1b[0m\r\n`)
+        if (sessionRef.current === session) sessionRef.current = null
+        setBusy(false)
+        setBackendStatus('')
+        if (showPopup) {
+          setPopup({
+            fileName,
+            result: { fileName, exitCode, ms: performance.now() - t0, compileFailed: compileFailed || exitCode !== 0, output }
+          })
+        }
+      }
+
+      session.onopen = () => {
+        log('\x1b[2mConnecting to interactive C++ runner…\x1b[0m\r\n')
+        session.send(JSON.stringify({ type: 'start', entry: active, files: filesRef.current }))
+        termRef.current?.focus()
+      }
+      session.onmessage = (event) => {
+        let message: { type?: string; message?: string; data?: string; code?: number }
+        try {
+          message = JSON.parse(String(event.data))
+        } catch {
+          return
+        }
+        if (message.type === 'status' && message.message) log(message.message)
+        if (message.type === 'output' && message.data) {
+          output += message.data
+          log(message.data)
+        }
+        if (message.type === 'error' && message.message) {
+          compileFailed = true
+          output += `${message.message}\n`
+          log(`\x1b[31m${message.message}\x1b[0m\r\n`)
+        }
+        if (message.type === 'exit') finish(Number(message.code ?? 1))
+      }
+      session.onerror = () => {
+        if (exited) return
+        setBackendStatus('Connecting... (server may be waking up, up to 60s)')
+        if (sessionRef.current === session) {
+          sessionRef.current = null
+          void connectSession()
+        }
+      }
+      session.onclose = () => {
+        if (!exited && sessionRef.current === session) {
+          setBackendStatus('Connecting... (server may be waking up, up to 60s)')
+          sessionRef.current = null
+          void connectSession()
+        }
       }
     }
 
-    const session = new WebSocket(endpoint)
-    sessionRef.current = session
-    session.onopen = () => {
-      log('\x1b[2mConnecting to interactive C++ runner…\x1b[0m\r\n')
-      session.send(JSON.stringify({ type: 'start', entry: active, files: filesRef.current }))
-      termRef.current?.focus()
-    }
-    session.onmessage = (event) => {
-      let message: { type?: string; message?: string; data?: string; code?: number }
-      try {
-        message = JSON.parse(String(event.data))
-      } catch {
-        return
-      }
-      if (message.type === 'status' && message.message) log(message.message)
-      if (message.type === 'output' && message.data) {
-        output += message.data
-        log(message.data)
-      }
-      if (message.type === 'error' && message.message) {
-        compileFailed = true
-        output += `${message.message}\n`
-        log(`\x1b[31m${message.message}\x1b[0m\r\n`)
-      }
-      if (message.type === 'exit') finish(Number(message.code ?? 1))
-    }
-    session.onerror = () => {
-      if (exited) return
-      compileFailed = true
-      const msg = `Could not connect to the runner at ${endpoint.host}. Check VITE_API_URL (Vercel) and FRONTEND_URL (Render), and wait ~30s if the free instance is waking up.`
-      output += msg
-      log(`\x1b[31m${msg}\x1b[0m\r\n`)
-    }
-    session.onclose = () => {
-      if (!exited && sessionRef.current === session) {
-        compileFailed = true
-        output += 'The interactive session ended unexpectedly.'
-        log('\x1b[31mThe interactive session ended unexpectedly.\x1b[0m\r\n')
-        finish(1)
-      }
-    }
-  }, [active, busy, log, showPopup])
+    await connectSession()
+  }, [active, busy, log, pickBackend, showPopup])
 
   const stop = useCallback(() => {
     sessionRef.current?.close(1000, 'Stopped')
@@ -330,6 +369,7 @@ export default function App() {
           <span className="status-item" title="Your active file is compiled to WebAssembly and run in Wasmtime on the server.">
             clang++ · WASI sandbox
           </span>
+          {backendStatus && <span className="status-item">{backendStatus}</span>}
           {busy && <span className="status-item">Running</span>}
         </div>
         <div className="status-group">
