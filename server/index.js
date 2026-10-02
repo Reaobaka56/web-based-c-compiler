@@ -15,11 +15,11 @@ const isAllowedOrigin = (origin) => !!origin && allowedOrigins.includes(origin)
 const maxSourceBytes = 65_536
 const maxInputBytes = 65_536
 const maxOutputBytes = 1_048_576
-const maxActiveRuns = Number(process.env.MAX_ACTIVE_RUNS) || 10
+const maxActiveRuns = Number(process.env.MAX_ACTIVE_RUNS) || 3
 const maxRunsPerIp = Number(process.env.MAX_RUNS_PER_IP) || 3
-const maxConcurrentCompiles = Number(process.env.MAX_CONCURRENT_COMPILES) || 2
+const maxConcurrentCompiles = Number(process.env.MAX_CONCURRENT_COMPILES) || 1
 const maxQueuedCompiles = 20
-const runMemoryBytes = (Number(process.env.RUN_MEMORY_MB) || 64) * 1024 * 1024
+const runMemoryBytes = (Number(process.env.RUN_MEMORY_MB) || 32) * 1024 * 1024
 const maxProjectFiles = 20
 const maxProjectBytes = 262_144
 let activeRuns = 0
