@@ -26,9 +26,13 @@ export default function App() {
   const [refreshKey, setRefreshKey] = useState(0)
   const [busy, setBusy] = useState(false)
   const [cursor, setCursor] = useState({ line: 1, col: 1 })
-  const [panelHeight, setPanelHeight] = useState(220)
+  const [panelHeight, setPanelHeight] = useState(() => window.matchMedia('(max-width: 640px)').matches
+    ? Math.round(window.innerHeight * 0.35)
+    : 220)
   const [showFiles, setShowFiles] = useState(true)
   const [showTerminal, setShowTerminal] = useState(true)
+  const [mobileFilesOpen, setMobileFilesOpen] = useState(false)
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [popup, setPopup] = useState<{ fileName: string; result: RunResult | null } | null>(null)
   const [backendStatus, setBackendStatus] = useState('')
   const [showPopup, setShowPopup] = useState(() => {
@@ -42,6 +46,7 @@ export default function App() {
   const sessionRef = useRef<WebSocket | null>(null)
   const inputLineRef = useRef('')
   const filesRef = useRef(files)
+  const mobileMenuRef = useRef<HTMLDivElement>(null)
   filesRef.current = files
 
   useEffect(() => {
@@ -57,6 +62,29 @@ export default function App() {
     window.addEventListener('keydown', dismissOnEscape)
     return () => window.removeEventListener('keydown', dismissOnEscape)
   }, [showWelcome])
+
+  useEffect(() => {
+    if (!mobileMenuOpen && !mobileFilesOpen) return
+
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setMobileMenuOpen(false)
+        setMobileFilesOpen(false)
+      }
+    }
+    const closeMenuOnOutsideClick = (event: PointerEvent) => {
+      if (mobileMenuOpen && !mobileMenuRef.current?.contains(event.target as Node)) {
+        setMobileMenuOpen(false)
+      }
+    }
+
+    document.addEventListener('keydown', closeOnEscape)
+    document.addEventListener('pointerdown', closeMenuOnOutsideClick)
+    return () => {
+      document.removeEventListener('keydown', closeOnEscape)
+      document.removeEventListener('pointerdown', closeMenuOnOutsideClick)
+    }
+  }, [mobileMenuOpen, mobileFilesOpen])
 
   useEffect(() => {
     ;(async () => {
@@ -106,6 +134,7 @@ export default function App() {
     setFiles((f) => ({ ...f, [path]: f[path] ?? '' }))
     setOpenTabs((t) => (t.includes(path) ? t : [...t, path]))
     setActive(path)
+    setMobileFilesOpen(false)
   }, [])
 
   const closeTab = useCallback((path: string) => {
@@ -322,10 +351,37 @@ export default function App() {
             ? <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="3" fill="none" stroke="currentColor" strokeWidth="1.4" /><path d="M8 1.5v1.4M8 13.1v1.4M1.5 8h1.4M13.1 8h1.4m-10.1-4.6 1 1m5.2 5.2 1 1m0-7.3-1 1m-5.2 5.2-1 1" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" /></svg>
             : <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M13.4 10.2A5.9 5.9 0 0 1 5.8 2.6 5.9 5.9 0 1 0 13.4 10.2Z" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" /></svg>}
         </button>
+        <div className="mobile-overflow" ref={mobileMenuRef}>
+          <button
+            className="mobile-overflow-trigger"
+            type="button"
+            aria-label="More options"
+            aria-expanded={mobileMenuOpen}
+            aria-controls="mobile-overflow-panel"
+            onClick={() => setMobileMenuOpen((open) => !open)}
+          >
+            <span aria-hidden="true">···</span>
+          </button>
+          <div className={'mobile-overflow-panel' + (mobileMenuOpen ? ' open' : '')} id="mobile-overflow-panel">
+            <button type="button" className="mobile-menu-action" aria-expanded={mobileFilesOpen} onClick={() => { setMobileFilesOpen(true); setMobileMenuOpen(false) }}>Files</button>
+            <button type="button" className="mobile-menu-action" aria-expanded={showTerminal} onClick={() => { setShowTerminal((shown) => !shown); setMobileMenuOpen(false) }}>Terminal</button>
+            <label className="popup-toggle mobile-popup-toggle" title="Show a result popup after each run">
+              <input type="checkbox" checked={showPopup} onChange={(event) => setShowPopup(event.target.checked)} />
+              Result popup
+            </label>
+            <button className="theme-toggle mobile-theme-toggle" type="button" onClick={() => { toggleTheme(); setMobileMenuOpen(false) }} aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`} title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}>
+              {theme === 'dark'
+                ? <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="3" fill="none" stroke="currentColor" strokeWidth="1.4" /><path d="M8 1.5v1.4M8 13.1v1.4M1.5 8h1.4M13.1 8h1.4m-10.1-4.6 1 1m5.2 5.2 1 1m0-7.3-1 1m-5.2 5.2-1 1" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" /></svg>
+                : <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M13.4 10.2A5.9 5.9 0 0 1 5.8 2.6 5.9 5.9 0 1 0 13.4 10.2Z" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" /></svg>}
+              Theme
+            </button>
+          </div>
+        </div>
       </header>
 
       <div className="body">
-        <aside className={'sidebar' + (showFiles ? '' : ' collapsed')}>
+        {mobileFilesOpen && <div className="mobile-drawer-backdrop" aria-hidden="true" onClick={() => setMobileFilesOpen(false)} />}
+        <aside className={'sidebar' + (showFiles ? '' : ' collapsed') + (mobileFilesOpen ? ' mobile-open' : '')}>
           <FileManager active={active} refreshKey={refreshKey}
             onOpen={openFile} onChanged={() => setRefreshKey((k) => k + 1)} onDeleted={onFileDeleted} />
         </aside>

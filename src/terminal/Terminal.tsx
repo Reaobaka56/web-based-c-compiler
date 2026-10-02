@@ -34,11 +34,12 @@ const Terminal = forwardRef<TerminalHandle>(function Terminal(_, ref) {
     const host = hostRef.current
     if (!host) return
 
+    const mobileQuery = window.matchMedia('(max-width: 640px)')
     const term = new XTerm({
       cursorBlink: true,
       convertEol: true,
       fontFamily: cssVar('--font-mono'),
-      fontSize: 13,
+      fontSize: mobileQuery.matches ? 14 : 13,
       theme: currentTheme()
     })
     const fit = new FitAddon()
@@ -56,12 +57,18 @@ const Terminal = forwardRef<TerminalHandle>(function Terminal(_, ref) {
       term.options.theme = currentTheme()
     })
     themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] })
+    const updateFontSize = (event: MediaQueryListEvent) => {
+      term.options.fontSize = event.matches ? 14 : 13
+      fit.fit()
+    }
+    mobileQuery.addEventListener('change', updateFontSize)
 
     termRef.current = term
 
     return () => {
       resizeObserver.disconnect()
       themeObserver.disconnect()
+      mobileQuery.removeEventListener('change', updateFontSize)
       term.dispose()
       termRef.current = null
     }
