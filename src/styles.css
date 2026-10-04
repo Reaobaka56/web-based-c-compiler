@@ -401,6 +401,7 @@ ul { list-style: none; }
   color: var(--fg);
   font: 12px/1.4 var(--font-mono);
 }
+.code-presentation-button,
 .code-test-button {
   min-height: 28px;
   padding-inline: 14px;
@@ -409,9 +410,12 @@ ul { list-style: none; }
   color: var(--on-accent);
   transition: background-color 140ms ease-out, border-color 140ms ease-out, box-shadow 140ms ease-out;
 }
+.code-presentation-button:hover,
 .code-test-button:hover { border-color: var(--accent-hover); background: var(--accent-hover); box-shadow: 0 3px 10px rgba(0, 0, 0, 0.18); }
 @media (prefers-reduced-motion: no-preference) {
+  .code-presentation-button,
   .code-test-button { animation: code-test-bounce 1.6s ease-in-out infinite; }
+  .code-presentation-button:hover,
   .code-test-button:hover { animation-play-state: paused; }
   @keyframes code-test-bounce {
     0%, 100% { transform: translateY(0); }
