@@ -3,11 +3,12 @@ import { LINKED_LIST_EXAMPLE } from './fs/vfs'
 
 type LandingProps = {
   onOpenEditor: () => void
+  onViewPresentation: () => void
   theme: 'dark' | 'light'
   onToggleTheme: () => void
 }
 
-export default function Landing({ onOpenEditor, theme, onToggleTheme }: LandingProps) {
+export default function Landing({ onOpenEditor, onViewPresentation, theme, onToggleTheme }: LandingProps) {
   const [menuOpen, setMenuOpen] = useState(false)
   const [aboutOpen, setAboutOpen] = useState(false)
   const headerRef = useRef<HTMLElement>(null)
@@ -91,13 +92,14 @@ export default function Landing({ onOpenEditor, theme, onToggleTheme }: LandingP
           <div className="code-card">
             <div className="code-card-header">
               <span>main.cpp</span>
-              <button
-                type="button"
-                className="btn code-test-button"
-                onClick={onOpenEditor}
-              >
-                Test code
-              </button>
+              <div className="code-card-actions">
+                <button type="button" className="btn code-presentation-button" onClick={onViewPresentation}>
+                  View presentation
+                </button>
+                <button type="button" className="btn code-test-button" onClick={onOpenEditor}>
+                  Test code
+                </button>
+              </div>
             </div>
             <pre><code>{LINKED_LIST_EXAMPLE}</code></pre>
           </div>

@@ -4,6 +4,7 @@ import FileManager from './fs/FileManager'
 import Editor from './editor/Editor'
 import Terminal, { TerminalHandle } from './terminal/Terminal'
 import RunResultPopup, { type RunResult } from './ui/RunResultPopup'
+import PresentationViewer from './ui/PresentationViewer'
 import { ensureDefaultProject, readAll, writeFile } from './fs/vfs'
 
 const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform)
@@ -22,6 +23,7 @@ export default function App() {
   const [openTabs, setOpenTabs] = useState<string[]>([])
   const [active, setActive] = useState<string | null>(null)
   const [showLanding, setShowLanding] = useState(true)
+  const [showPresentation, setShowPresentation] = useState(false)
   const [showWelcome, setShowWelcome] = useState(false)
   const [refreshKey, setRefreshKey] = useState(0)
   const [busy, setBusy] = useState(false)
@@ -313,7 +315,12 @@ export default function App() {
   }
 
   if (showLanding) {
-    return <Landing onOpenEditor={openEditor} theme={theme} onToggleTheme={toggleTheme} />
+    return (
+      <>
+        <Landing onOpenEditor={openEditor} onViewPresentation={() => setShowPresentation(true)} theme={theme} onToggleTheme={toggleTheme} />
+        {showPresentation && <PresentationViewer onClose={() => setShowPresentation(false)} />}
+      </>
+    )
   }
 
   return (
@@ -342,6 +349,9 @@ export default function App() {
             <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><rect x="2" y="2" width="6" height="6" fill="currentColor" /></svg>
             Stop
           </button>
+          <button className="btn presentation-toolbar-button" type="button" onClick={() => setShowPresentation(true)} title="Open the slide deck">
+            View Presentation
+          </button>
         </div>
         <label className="popup-toggle" title="Show a result popup after each run">
           <input type="checkbox" checked={showPopup} onChange={(event) => setShowPopup(event.target.checked)} />
@@ -365,6 +375,7 @@ export default function App() {
           </button>
           <div className={'mobile-overflow-panel' + (mobileMenuOpen ? ' open' : '')} id="mobile-overflow-panel">
             <button type="button" className="mobile-menu-action" aria-expanded={mobileFilesOpen} onClick={() => { setMobileFilesOpen(true); setMobileMenuOpen(false) }}>Files</button>
+            <button type="button" className="mobile-menu-action" onClick={() => { setShowPresentation(true); setMobileMenuOpen(false) }}>View Presentation</button>
             <button type="button" className="mobile-menu-action" aria-expanded={showTerminal} onClick={() => { setShowTerminal((shown) => !shown); setMobileMenuOpen(false) }}>Terminal</button>
             <label className="popup-toggle mobile-popup-toggle" title="Show a result popup after each run">
               <input type="checkbox" checked={showPopup} onChange={(event) => setShowPopup(event.target.checked)} />
@@ -444,6 +455,8 @@ export default function App() {
           onCancel={stop}
         />
       )}
+
+      {showPresentation && <PresentationViewer onClose={() => setShowPresentation(false)} />}
 
       {showWelcome && (
         <div className="welcome-backdrop" onClick={() => setShowWelcome(false)}>
