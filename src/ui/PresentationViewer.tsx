@@ -202,8 +202,11 @@ export default function PresentationViewer({ onClose }: Props) {
 
           {assetError && (
             <div className="pv-error" role="alert">
-              <strong>Presentation slides are unavailable.</strong>
-              <span>Add the rendered images under <code>public/presentation/</code> to view this deck.</span>
+              <strong>Slide previews are unavailable.</strong>
+              <span>You can still open the PowerPoint presentation.</span>
+              <a className="btn" href={`${BASE}/slide-deck.pptx`} target="_blank" rel="noreferrer">
+                Open PowerPoint presentation
+              </a>
             </div>
           )}
         </div>
